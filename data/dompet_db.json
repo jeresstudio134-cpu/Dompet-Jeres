@@ -1,0 +1,793 @@
+{
+  "accounts": [
+    {
+      "id": "cash",
+      "name": "Cash",
+      "type": "cash",
+      "color": "#10b981",
+      "iconName": "Banknote",
+      "initialBalance": 0
+    },
+    {
+      "id": "dana",
+      "name": "Dana",
+      "type": "ewallet",
+      "color": "#0284c7",
+      "iconName": "Smartphone",
+      "initialBalance": 0
+    },
+    {
+      "id": "seabank",
+      "name": "Seabank",
+      "type": "bank",
+      "color": "#ea580c",
+      "iconName": "Building2",
+      "initialBalance": 0
+    },
+    {
+      "id": "shoopepay",
+      "name": "Shoopepay",
+      "type": "ewallet",
+      "color": "#f97316",
+      "iconName": "CreditCard",
+      "initialBalance": 0
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx-recent-1",
+      "no": 67,
+      "date": "2026-09-29",
+      "description": "Bayar Abah Rahmadi untuk bangun rumah",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Abah Rahmadi",
+      "amount": 1000000,
+      "createdAt": "2026-09-29T10:00:00Z"
+    },
+    {
+      "id": "tx-recent-2",
+      "no": 66,
+      "date": "2026-09-28",
+      "description": "Pemasukan Toko",
+      "accountId": "seabank",
+      "type": "masuk",
+      "category": "Toko",
+      "amount": 44877,
+      "createdAt": "2026-09-28T14:30:00Z"
+    },
+    {
+      "id": "tx-recent-3",
+      "no": 65,
+      "date": "2026-09-28",
+      "description": "Pinjam ali buat dp ke abah rahmadi",
+      "accountId": "seabank",
+      "type": "masuk",
+      "category": "Pinjam Ali",
+      "amount": 1000000,
+      "createdAt": "2026-09-28T09:15:00Z"
+    },
+    {
+      "id": "tx-recent-4",
+      "no": 64,
+      "date": "2026-08-17",
+      "description": "Pindah",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pindah Saldo",
+      "amount": 1000000,
+      "createdAt": "2026-08-17T11:00:00Z"
+    },
+    {
+      "id": "tx-recent-5",
+      "no": 63,
+      "date": "2026-08-17",
+      "description": "Pindah",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pindah Saldo",
+      "amount": 1000000,
+      "createdAt": "2026-08-17T11:00:00Z"
+    },
+    {
+      "id": "tx-1",
+      "no": 1,
+      "date": "2026-06-12",
+      "description": "Sisa Saldo Awal",
+      "accountId": "seabank",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 1500000,
+      "createdAt": "2026-06-12T08:00:00Z"
+    },
+    {
+      "id": "tx-2",
+      "no": 6,
+      "date": "2026-07-10",
+      "description": "Bulanan Wifi",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 125000,
+      "createdAt": "2026-07-10T09:00:00Z"
+    },
+    {
+      "id": "tx-3",
+      "no": 7,
+      "date": "2026-07-10",
+      "description": "Pemasukan Toko",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 41000,
+      "createdAt": "2026-07-10T10:00:00Z"
+    },
+    {
+      "id": "tx-4",
+      "no": 8,
+      "date": "2026-07-10",
+      "description": "Pemasukan Toko",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 80000,
+      "createdAt": "2026-07-10T11:00:00Z"
+    },
+    {
+      "id": "tx-5",
+      "no": 9,
+      "date": "2026-07-10",
+      "description": "Pemasukan Toko",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 80000,
+      "createdAt": "2026-07-10T12:00:00Z"
+    },
+    {
+      "id": "tx-6",
+      "no": 10,
+      "date": "2026-07-10",
+      "description": "Amanah (Stiker vinyl+lam A3)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 37500,
+      "createdAt": "2026-07-10T13:00:00Z"
+    },
+    {
+      "id": "tx-7",
+      "no": 11,
+      "date": "2026-07-10",
+      "description": "Ppcp DTF 54cm+ongkir",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 15900,
+      "createdAt": "2026-07-10T14:00:00Z"
+    },
+    {
+      "id": "tx-8",
+      "no": 12,
+      "date": "2026-07-13",
+      "description": "Pindah ke Cash",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pindah Saldo",
+      "amount": 50000,
+      "transferTargetAccountId": "cash",
+      "createdAt": "2026-07-13T09:00:00Z"
+    },
+    {
+      "id": "tx-9",
+      "no": 13,
+      "date": "2026-07-13",
+      "description": "Pindah dari TF",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pindah Saldo",
+      "amount": 50000,
+      "createdAt": "2026-07-13T09:00:00Z"
+    },
+    {
+      "id": "tx-10",
+      "no": 14,
+      "date": "2026-07-13",
+      "description": "Bubur",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 5000,
+      "createdAt": "2026-07-13T10:00:00Z"
+    },
+    {
+      "id": "tx-11",
+      "no": 15,
+      "date": "2026-07-13",
+      "description": "Bakso",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 5000,
+      "createdAt": "2026-07-13T11:00:00Z"
+    },
+    {
+      "id": "tx-12",
+      "no": 16,
+      "date": "2026-07-13",
+      "description": "BRI",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 100000,
+      "createdAt": "2026-07-13T12:00:00Z"
+    },
+    {
+      "id": "tx-13",
+      "no": 17,
+      "date": "2026-07-13",
+      "description": "Saldo",
+      "accountId": "seabank",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 742153,
+      "createdAt": "2026-07-13T13:00:00Z"
+    },
+    {
+      "id": "tx-14",
+      "no": 18,
+      "date": "2026-07-13",
+      "description": "Saldo",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 260607,
+      "createdAt": "2026-07-13T13:30:00Z"
+    },
+    {
+      "id": "tx-15",
+      "no": 19,
+      "date": "2026-07-13",
+      "description": "Saldo",
+      "accountId": "shoopepay",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 4120,
+      "createdAt": "2026-07-13T14:00:00Z"
+    },
+    {
+      "id": "tx-16",
+      "no": 20,
+      "date": "2026-07-14",
+      "description": "Frame id card bening 65pcs",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 43260,
+      "createdAt": "2026-07-14T09:00:00Z"
+    },
+    {
+      "id": "tx-17",
+      "no": 21,
+      "date": "2026-07-15",
+      "description": "Ongkir ppcp",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 5000,
+      "createdAt": "2026-07-15T09:30:00Z"
+    },
+    {
+      "id": "tx-18",
+      "no": 22,
+      "date": "2026-07-15",
+      "description": "Pemasukan Toko",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 69000,
+      "createdAt": "2026-07-15T10:00:00Z"
+    },
+    {
+      "id": "tx-19",
+      "no": 23,
+      "date": "2026-07-15",
+      "description": "Golden stiker crome rainbow",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 17500,
+      "createdAt": "2026-07-15T11:00:00Z"
+    },
+    {
+      "id": "tx-20",
+      "no": 24,
+      "date": "2026-07-15",
+      "description": "Pemasukan Toko",
+      "accountId": "seabank",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 400000,
+      "createdAt": "2026-07-15T12:00:00Z"
+    },
+    {
+      "id": "tx-21",
+      "no": 25,
+      "date": "2026-07-15",
+      "description": "Shopee (Pvc 0,7mm 4pack)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 136935,
+      "createdAt": "2026-07-15T13:00:00Z"
+    },
+    {
+      "id": "tx-22",
+      "no": 26,
+      "date": "2026-07-16",
+      "description": "Pokok",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 50000,
+      "createdAt": "2026-07-16T10:00:00Z"
+    },
+    {
+      "id": "tx-23",
+      "no": 27,
+      "date": "2026-07-17",
+      "description": "Jajan Donat",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 10000,
+      "createdAt": "2026-07-17T11:00:00Z"
+    },
+    {
+      "id": "tx-24",
+      "no": 28,
+      "date": "2026-07-17",
+      "description": "Susu+jajan muham",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 6000,
+      "createdAt": "2026-07-17T14:00:00Z"
+    },
+    {
+      "id": "tx-25",
+      "no": 29,
+      "date": "2026-07-17",
+      "description": "DiPinjam",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 110000,
+      "createdAt": "2026-07-17T16:00:00Z"
+    },
+    {
+      "id": "tx-26",
+      "no": 30,
+      "date": "2026-07-18",
+      "description": "Bensin",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Kendaraan",
+      "amount": 20000,
+      "createdAt": "2026-07-18T08:00:00Z"
+    },
+    {
+      "id": "tx-27",
+      "no": 31,
+      "date": "2026-07-18",
+      "description": "Shopee (lanyard 2cm)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 47329,
+      "createdAt": "2026-07-18T10:00:00Z"
+    },
+    {
+      "id": "tx-28",
+      "no": 32,
+      "date": "2026-07-18",
+      "description": "Shopee (obat nyamuk elektrik)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 18071,
+      "createdAt": "2026-07-18T14:00:00Z"
+    },
+    {
+      "id": "tx-29",
+      "no": 33,
+      "date": "2026-07-20",
+      "description": "Pemasukan Toko",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 320000,
+      "createdAt": "2026-07-20T09:00:00Z"
+    },
+    {
+      "id": "tx-30",
+      "no": 34,
+      "date": "2026-07-20",
+      "description": "Bakso",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 5000,
+      "createdAt": "2026-07-20T12:00:00Z"
+    },
+    {
+      "id": "tx-31",
+      "no": 35,
+      "date": "2026-07-20",
+      "description": "Palet kayu (120x3x2 3pcs)",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 21000,
+      "createdAt": "2026-07-20T13:00:00Z"
+    },
+    {
+      "id": "tx-32",
+      "no": 36,
+      "date": "2026-07-20",
+      "description": "Semen imasko 2sak",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Bangun Rumah",
+      "amount": 84000,
+      "createdAt": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "tx-33",
+      "no": 37,
+      "date": "2026-07-21",
+      "description": "Shopeelater (panci)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 220000,
+      "createdAt": "2026-07-21T10:00:00Z"
+    },
+    {
+      "id": "tx-34",
+      "no": 38,
+      "date": "2026-07-22",
+      "description": "TI (semen imasko 2sak+bor 2)",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Bangun Rumah",
+      "amount": 90000,
+      "createdAt": "2026-07-22T09:00:00Z"
+    },
+    {
+      "id": "tx-35",
+      "no": 39,
+      "date": "2026-07-22",
+      "description": "Bensin",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Kendaraan",
+      "amount": 30000,
+      "createdAt": "2026-07-22T11:00:00Z"
+    },
+    {
+      "id": "tx-36",
+      "no": 40,
+      "date": "2026-07-22",
+      "description": "Buwuh sunatan",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 20000,
+      "createdAt": "2026-07-22T14:00:00Z"
+    },
+    {
+      "id": "tx-37",
+      "no": 41,
+      "date": "2026-07-22",
+      "description": "Pemasukan Toko",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 450000,
+      "createdAt": "2026-07-22T16:00:00Z"
+    },
+    {
+      "id": "tx-38",
+      "no": 42,
+      "date": "2026-07-24",
+      "description": "Amal masjid",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pribadi",
+      "amount": 2000,
+      "createdAt": "2026-07-24T12:00:00Z"
+    },
+    {
+      "id": "tx-39",
+      "no": 43,
+      "date": "2026-07-24",
+      "description": "Pemasukan Toko",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 84000,
+      "createdAt": "2026-07-24T13:00:00Z"
+    },
+    {
+      "id": "tx-40",
+      "no": 44,
+      "date": "2026-07-24",
+      "description": "TI (semen imasko 2sak+mata)",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Bangun Rumah",
+      "amount": 92000,
+      "createdAt": "2026-07-24T15:00:00Z"
+    },
+    {
+      "id": "tx-41",
+      "no": 45,
+      "date": "2026-07-25",
+      "description": "Listrik",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 83000,
+      "createdAt": "2026-07-25T08:00:00Z"
+    },
+    {
+      "id": "tx-42",
+      "no": 46,
+      "date": "2026-07-25",
+      "description": "Shopee (opp 10x22 3pcs+resi)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 31400,
+      "createdAt": "2026-07-25T11:00:00Z"
+    },
+    {
+      "id": "tx-43",
+      "no": 47,
+      "date": "2026-07-26",
+      "description": "Pemasukan Toko",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 150000,
+      "createdAt": "2026-07-26T10:00:00Z"
+    },
+    {
+      "id": "tx-44",
+      "no": 48,
+      "date": "2026-07-26",
+      "description": "Bensin",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Kendaraan",
+      "amount": 30000,
+      "createdAt": "2026-07-26T14:00:00Z"
+    },
+    {
+      "id": "tx-45",
+      "no": 49,
+      "date": "2026-07-27",
+      "description": "Pindah ke Seabank",
+      "accountId": "dana",
+      "type": "keluar",
+      "category": "Pindah Saldo",
+      "amount": 200000,
+      "transferTargetAccountId": "seabank",
+      "createdAt": "2026-07-27T09:00:00Z"
+    },
+    {
+      "id": "tx-46",
+      "no": 50,
+      "date": "2026-07-27",
+      "description": "Pindah dari Dana",
+      "accountId": "seabank",
+      "type": "masuk",
+      "category": "Pindah Saldo",
+      "amount": 200000,
+      "createdAt": "2026-07-27T09:00:00Z"
+    },
+    {
+      "id": "tx-47",
+      "no": 51,
+      "date": "2026-07-27",
+      "description": "Amanah (banner)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 204000,
+      "createdAt": "2026-07-27T10:00:00Z"
+    },
+    {
+      "id": "tx-48",
+      "no": 52,
+      "date": "2026-07-27",
+      "description": "Pemasukan Toko",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 264000,
+      "createdAt": "2026-07-27T12:00:00Z"
+    },
+    {
+      "id": "tx-49",
+      "no": 53,
+      "date": "2026-07-27",
+      "description": "TI (semen singa merah 2sak)",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Bangun Rumah",
+      "amount": 90000,
+      "createdAt": "2026-07-27T15:00:00Z"
+    },
+    {
+      "id": "tx-50",
+      "no": 54,
+      "date": "2026-07-29",
+      "description": "Pokok",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 200000,
+      "createdAt": "2026-07-29T10:00:00Z"
+    },
+    {
+      "id": "tx-51",
+      "no": 55,
+      "date": "2026-07-29",
+      "description": "Pokok",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 40000,
+      "createdAt": "2026-07-29T14:00:00Z"
+    },
+    {
+      "id": "tx-52",
+      "no": 56,
+      "date": "2026-07-31",
+      "description": "Pemasukan Toko",
+      "accountId": "cash",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 16000,
+      "createdAt": "2026-07-31T09:00:00Z"
+    },
+    {
+      "id": "tx-53",
+      "no": 57,
+      "date": "2026-07-31",
+      "description": "Bensin",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Kendaraan",
+      "amount": 30000,
+      "createdAt": "2026-07-31T11:00:00Z"
+    },
+    {
+      "id": "tx-54",
+      "no": 58,
+      "date": "2026-07-31",
+      "description": "Pemasukan Toko",
+      "accountId": "dana",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 70000,
+      "createdAt": "2026-07-31T14:00:00Z"
+    },
+    {
+      "id": "tx-55",
+      "no": 59,
+      "date": "2026-07-31",
+      "description": "Shopee (DC charger macbook)",
+      "accountId": "seabank",
+      "type": "keluar",
+      "category": "Operasional Toko",
+      "amount": 97510,
+      "createdAt": "2026-07-31T16:00:00Z"
+    },
+    {
+      "id": "tx-56",
+      "no": 60,
+      "date": "2026-08-01",
+      "description": "Pemasukan Toko",
+      "accountId": "shoopepay",
+      "type": "masuk",
+      "category": "Pemasukan Toko",
+      "amount": 10000,
+      "createdAt": "2026-08-01T10:00:00Z"
+    },
+    {
+      "id": "tx-57",
+      "no": 61,
+      "date": "2026-08-01",
+      "description": "Pokok",
+      "accountId": "cash",
+      "type": "keluar",
+      "category": "Pokok",
+      "amount": 90000,
+      "createdAt": "2026-08-01T13:00:00Z"
+    },
+    {
+      "id": "tx-58",
+      "no": 62,
+      "date": "2026-08-02",
+      "description": "Pindah ke Seabank",
+      "accountId": "dana",
+      "type": "keluar",
+      "category": "Pindah Saldo",
+      "amount": 200000,
+      "transferTargetAccountId": "seabank",
+      "createdAt": "2026-08-02T10:00:00Z"
+    }
+  ],
+  "categories": [
+    {
+      "name": "Toko",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Pemasukan Toko",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Pribadi",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Pokok",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Kendaraan",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Bangun Rumah",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Operasional Toko",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Abah Rahmadi",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Pinjam Ali",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    },
+    {
+      "name": "Pindah Saldo",
+      "openingBalance": 0,
+      "createdAt": "2026-10-04T08:11:50.731Z"
+    }
+  ],
+  "settings": {
+    "store_name": "JERES STUDIO",
+    "admin_pin_len": "4"
+  },
+  "debts": [],
+  "debtPayments": [],
+  "yearlyArchives": []
+}

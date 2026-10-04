@@ -48,7 +48,8 @@ import { NeonVercelModal } from './components/NeonVercelModal.tsx';
 import { ExportImportModal } from './components/ExportImportModal.tsx';
 import { AdminPinModal } from './components/AdminPinModal.tsx';
 import { UtangPiutangView } from './components/UtangPiutangView.tsx';
-import { Wallet, CreditCard } from 'lucide-react';
+import { BukuTahunanView } from './components/BukuTahunanView.tsx';
+import { Wallet, CreditCard, BookOpen } from 'lucide-react';
 
 
 export default function App() {
@@ -110,10 +111,10 @@ export default function App() {
   };
 
   // ============================================
-  // UTANG & PIUTANG
+  // UTANG & PIUTANG & BUKU TAHUNAN
   // ============================================
   const [debts, setDebts] = useState<Debt[]>([]);
-  const [mainView, setMainView] = useState<'dompet' | 'utang'>('dompet');
+  const [mainView, setMainView] = useState<'dompet' | 'utang' | 'tahunan'>('dompet');
 
   // Handler: Tambah utang/piutang (dengan support payments dari AI)
   const handleAddDebt = async (
@@ -783,6 +784,18 @@ export default function App() {
             onDeletePayment={handleDeleteDebtPayment}
           />
         )}
+
+        {mainView === 'tahunan' && (
+          <BukuTahunanView
+            accounts={accounts}
+            transactions={transactions}
+            debts={debts}
+            categories={categories}
+            isAdmin={isAdmin}
+            onOpenAdminModal={() => setIsAdminModalOpen(true)}
+            onRefreshData={loadAll}
+          />
+        )}
       </main>
 
       {/* Bottom Navigation (fixed, always at bottom) */}
@@ -790,7 +803,7 @@ export default function App() {
         className="flex-shrink-0 w-full bg-white border-t border-slate-200 shadow-lg z-30"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <div className="max-w-md sm:max-w-lg md:max-w-xl mx-auto grid grid-cols-2">
+        <div className="max-w-md sm:max-w-lg md:max-w-xl mx-auto grid grid-cols-3">
           <button
             type="button"
             onClick={() => setMainView('dompet')}
@@ -819,6 +832,22 @@ export default function App() {
             <CreditCard className="w-5 h-5" />
             <span className="text-[10px] font-bold">Utang & Piutang</span>
             {mainView === 'utang' && (
+              <span className="absolute bottom-0 w-12 h-0.5 bg-[#1e3a5f] rounded-full" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView('tahunan')}
+            className={`relative flex flex-col items-center justify-center gap-0.5 py-2.5 transition cursor-pointer ${
+              mainView === 'tahunan'
+                ? 'text-[#1e3a5f]'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <BookOpen className="w-5 h-5" />
+            <span className="text-[10px] font-bold">Buku Tahunan</span>
+            {mainView === 'tahunan' && (
               <span className="absolute bottom-0 w-12 h-0.5 bg-[#1e3a5f] rounded-full" />
             )}
           </button>

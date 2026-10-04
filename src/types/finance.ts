@@ -93,4 +93,23 @@ export interface Debt {
   notes?: string;
   createdAt: string;
   payments: DebtPayment[];
+  archivedAt?: string;
+}
+
+export interface YearlyArchive {
+  id: string;
+  year: number;
+  transactionCount: number;
+  createdAt: string;
+  data: {
+    transactions: Transaction[];
+    accounts: Account[];
+    categories: string[];
+    debts: Debt[];
+    summary: {
+      totalMasuk: number;
+      totalKeluar: number;
+      sisa: number;
+    };
+  };
 }

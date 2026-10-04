@@ -126,6 +126,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       alert('Nominal harus lebih dari 0.');
       return;
     }
+    if (!editKategori.trim()) {
+      alert('Kantong wajib dipilih.');
+      return;
+    }
 
     const updated: Transaction = {
       ...editingTx,
@@ -134,7 +138,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       accountId: editAkun,
       type: editJenis,
       amount: parsedAmount,
-      category: editKategori,
+      category: editKategori.trim(),
       notes: editCatatan.trim() || undefined,
     };
 
@@ -223,21 +227,32 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseRupiahInput(nominalStr);
-    if (!keterangan.trim() || amount <= 0) return;
+    if (!keterangan.trim()) {
+      alert('Keterangan transaksi wajib diisi.');
+      return;
+    }
+    if (amount <= 0) {
+      alert('Nominal harus lebih dari 0.');
+      return;
+    }
+    if (!kategori.trim()) {
+      alert('Kantong wajib dipilih ketika mencatat transaksi.');
+      return;
+    }
 
     const ok = await onAddTransaction({
       date: tanggal,
       description: keterangan.trim(),
       accountId: selectedAkun,
       type: jenis,
-      category: kategori || (jenis === 'masuk' ? 'Toko' : 'Pribadi'),
+      category: kategori.trim(),
       amount,
     });
 
     if (ok === false) return;
     confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
     setKeterangan('');
-    setNominalStr('0');
+    setNominalStr('');
     setKategori('');
   };
 
@@ -841,13 +856,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               />
             </div>
 
-            {/* Kategori (opsional) */}
+            {/* Kantong (wajib diisi) */}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Kategori (opsional)
+                Kantong <span className="text-rose-500 font-bold">*</span> <span className="text-[10px] text-slate-400 font-normal">(wajib dipilih)</span>
               </label>
 
               <select
+                required
                 value={kategori}
                 onChange={(e) => {
                   if (e.target.value === '__NEW__') {
@@ -862,9 +878,11 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     setKategori(e.target.value);
                   }
                 }}
-                className="w-full bg-white text-slate-700 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer"
+                className={`w-full bg-white text-xs sm:text-sm rounded-lg px-3 py-2 border ${
+                  !kategori ? 'border-amber-300 text-slate-500' : 'border-slate-300 text-slate-700'
+                } focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer`}
               >
-                <option value="">— tanpa kategori —</option>
+                <option value="" disabled>— Pilih Kantong (wajib) —</option>
                 {allCategories.map(cat => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -872,31 +890,31 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 ))}
                 <option disabled>──────────</option>
                 <option value="__NEW__" className="font-bold text-[#1e3a5f]">
-                  +Tambah Kategori
+                  +Tambah Kantong
                 </option>
                 {isAdmin ? (
                   <option value="__MANAGE__" className="font-bold text-rose-600">
-                    -Hapus Kategori (Admin)
+                    -Hapus Kantong (Admin)
                   </option>
                 ) : (
                   <option value="__LOCKED_MANAGE__" className="text-slate-400">
-                    🔒 Hapus Kategori (Perlu PIN Admin)
+                    🔒 Hapus Kantong (Perlu PIN Admin)
                   </option>
                 )}
               </select>
 
-              {/* Inline input for adding a new category */}
+              {/* Inline input for adding a new category/pocket */}
               {isAddingNewCategory && (
                 <div className="mt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 animate-in fade-in space-y-1.5">
                   <div className="text-[11px] font-bold text-slate-700">
-                    + Tambah Kategori Baru:
+                    + Tambah Kantong Baru:
                   </div>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="text"
                       value={newCategoryInput}
                       onChange={(e) => setNewCategoryInput(e.target.value)}
-                      placeholder="Nama kategori baru..."
+                      placeholder="Nama kantong baru..."
                       className="flex-1 bg-white text-xs rounded-md px-2.5 py-1.5 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                       autoFocus
                       onKeyDown={(e) => {
@@ -935,10 +953,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     <div>
                       <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                        <span>- Hapus Kategori</span>
+                        <span>- Hapus Kantong</span>
                       </div>
                       <p className="text-[10px] sm:text-[11px] text-slate-500">
-                        Klik tombol hapus pada kategori yang ingin dihilangkan.
+                        Klik tombol hapus pada kantong yang ingin dihilangkan.
                       </p>
                     </div>
                     <button
@@ -954,7 +972,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   <div className="max-h-40 overflow-y-auto space-y-1 pr-1 divide-y divide-rose-100">
                     {allCategories.length === 0 ? (
                       <div className="text-center py-2 text-slate-400 text-xs">
-                        Belum ada kategori tersimpan.
+                        Belum ada kantong tersimpan.
                       </div>
                     ) : (
                       allCategories.map(cat => (
@@ -1885,17 +1903,18 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 />
               </div>
 
-              {/* Kategori */}
+              {/* Kantong */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kategori
+                  Kantong <span className="text-rose-500 font-bold">*</span> <span className="text-[10px] text-slate-400 font-normal">(wajib)</span>
                 </label>
                 <select
+                  required
                   value={editKategori}
                   onChange={(e) => setEditKategori(e.target.value)}
                   className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-xl px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                 >
-                  <option value="">— tanpa kategori —</option>
+                  <option value="" disabled>— Pilih Kantong (wajib) —</option>
                   {allCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}

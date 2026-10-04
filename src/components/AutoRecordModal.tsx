@@ -358,14 +358,14 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
                       }}
                       className={inputCls}
                     >
-                      <option value="">— tanpa kategori —</option>
+                      <option value="">— Pilih Kantong —</option>
                       {catOptions.map(c => (
                         <option key={c} value={c}>
                           {c}
                         </option>
                       ))}
                       <option value="__ADD_NEW__" className="text-emerald-400 font-bold bg-slate-800">
-                        ➕ Tambah Kategori Baru...
+                        ➕ Tambah Kantong Baru...
                       </option>
                     </select>
                   )}
@@ -377,7 +377,7 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
                       type="text"
                       autoFocus
                       value={newCatName}
-                      placeholder="Nama kategori baru..."
+                      placeholder="Nama kantong baru..."
                       onChange={e => setNewCatName(e.target.value)}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {

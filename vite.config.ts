@@ -8,7 +8,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     build: {
@@ -19,7 +19,7 @@ export default defineConfig(() => {
       exclude: ['@vercel/postgres', '@vercel/node'],
     },
     server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
+      hmr: false,
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: ['**/api/**', '**/api-backup/**'],
       },

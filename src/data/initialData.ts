@@ -1,4 +1,4 @@
-import { Account, Transaction } from '../types/finance.ts';
+import type { Account, Transaction } from '../types/finance.ts';
 
 export const INITIAL_ACCOUNTS: Account[] = [
   {

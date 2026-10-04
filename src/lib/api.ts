@@ -1,6 +1,6 @@
 import { Transaction, Account } from '../types/finance.ts';
 import { INITIAL_ACCOUNTS, INITIAL_CATEGORIES, INITIAL_TRANSACTIONS } from '../data/initialData.ts';
-import type { Debt, DebtPayment } from '../types/finance.ts';
+import type { Debt, DebtPayment, YearlyArchive } from '../types/finance.ts';
 
 const API_URL = '/api/transactions';
 const DEBTS_API_URL = '/api/debts';
@@ -595,4 +595,207 @@ export const apiDeleteDebtPayment = async (paymentId: string): Promise<void> => 
     }));
     saveLocalDebts(updated);
   }
+};
+
+// ============================================
+// BUKU TAHUNAN & TUTUP BUKU
+// ============================================
+
+const YEARLY_API_URL = '/api/yearly';
+const LOCAL_ARCHIVES_KEY = 'dompet_yearly_archives';
+
+function getLocalArchives(): YearlyArchive[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_ARCHIVES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function saveLocalArchive(archive: YearlyArchive) {
+  try {
+    const list = getLocalArchives().filter(a => a.year !== archive.year);
+    list.unshift(archive);
+    localStorage.setItem(LOCAL_ARCHIVES_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+export const apiYearlyListArchives = async (): Promise<{ year: number; transactionCount: number; createdAt: string }[]> => {
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    try {
+      const json = await safeRequest(YEARLY_API_URL);
+      if (json && json.success && Array.isArray(json.archives)) {
+        return json.archives;
+      }
+    } catch (e) {
+      console.warn('Failed to load yearly archives from backend:', e);
+    }
+  }
+
+  return getLocalArchives().map(a => ({
+    year: a.year,
+    transactionCount: a.transactionCount,
+    createdAt: a.createdAt,
+  }));
+};
+
+export const apiYearlyLoadArchive = async (year: number): Promise<YearlyArchive['data'] | null> => {
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    try {
+      const json = await safeRequest(`${YEARLY_API_URL}?year=${year}`);
+      if (json && json.success && json.archive) {
+        const rawData = json.archive.data;
+        return typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+      }
+    } catch (e) {
+      console.warn('Failed to load archive data from backend:', e);
+    }
+  }
+
+  const local = getLocalArchives().find(a => a.year === year);
+  return local ? local.data : null;
+};
+
+export const apiYearlyPreview = async (year: number): Promise<{
+  transactionCount: number;
+  accountBalances: { accountId: string; name: string; balance: number }[];
+  pocketBalances: { category: string; balance: number }[];
+  unpaidDebts: { id: string; name: string; remaining: number }[];
+}> => {
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    const json = await safeRequest(YEARLY_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'previewCloseBook', year }),
+    });
+    if (json && json.success && json.preview) {
+      return json.preview;
+    }
+  }
+
+  // Fallback kalkulasi lokal
+  const allTx = getLocalTransactions();
+  const yearStr = String(year);
+  const txThisYear = allTx.filter(t => t.date && t.date.startsWith(yearStr));
+
+  const accs = getLocalAccounts();
+  const accMap: Record<string, number> = {};
+  accs.forEach(a => { accMap[a.id] = a.initialBalance || 0; });
+
+  const cats = getLocalCategories();
+  const catMap: Record<string, number> = {};
+  cats.forEach(c => { catMap[c] = 0; });
+
+  txThisYear.forEach(t => {
+    const amt = t.amount || 0;
+    const isCat = t.id.startsWith('kt-');
+    const isAcc = t.category === 'Pindah Saldo';
+
+    if (!isCat && t.accountId && accMap[t.accountId] !== undefined) {
+      if (t.type === 'masuk') accMap[t.accountId] += amt;
+      else accMap[t.accountId] -= amt;
+    }
+
+    if (!isAcc && t.category) {
+      if (catMap[t.category] === undefined) catMap[t.category] = 0;
+      if (t.type === 'masuk') catMap[t.category] += amt;
+      else catMap[t.category] -= amt;
+    }
+  });
+
+  const debts = getLocalDebts();
+  const unpaidDebts: { id: string; name: string; remaining: number }[] = [];
+  debts.forEach(d => {
+    const total = d.totalAmount || 0;
+    const paid = (d.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+    const rem = total - paid;
+    if (rem > 0) unpaidDebts.push({ id: d.id, name: d.name, remaining: rem });
+  });
+
+  return {
+    transactionCount: txThisYear.length,
+    accountBalances: accs.map(a => ({ accountId: a.id, name: a.name, balance: accMap[a.id] ?? 0 })),
+    pocketBalances: Object.entries(catMap).map(([category, balance]) => ({ category, balance })),
+    unpaidDebts,
+  };
+};
+
+export const apiYearlyExecute = async (
+  year: number,
+  confirmText: string,
+  backupData?: YearlyArchive['data']
+): Promise<{ archived: number; newYear: number }> => {
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    const json = await safeRequest(YEARLY_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'executeCloseBook', year, confirmText }),
+    });
+    if (json && json.success) {
+      return { archived: json.archived, newYear: json.newYear };
+    }
+    throw new Error(json?.error || 'Gagal menjalankan tutup buku di server.');
+  }
+
+  // Fallback lokal
+  if (confirmText.trim().toUpperCase() !== `TUTUP BUKU ${year}`) {
+    throw new Error(`Konfirmasi harus "TUTUP BUKU ${year}".`);
+  }
+
+  const allTx = getLocalTransactions();
+  const yearStr = String(year);
+  const txYear = allTx.filter(t => t.date && t.date.startsWith(yearStr));
+  const remainingTx = allTx.filter(t => !t.date || !t.date.startsWith(yearStr));
+
+  // Simpan arsip lokal
+  if (backupData) {
+    const archiveObj: YearlyArchive = {
+      id: `archive-${year}`,
+      year,
+      transactionCount: txYear.length,
+      createdAt: new Date().toISOString(),
+      data: backupData,
+    };
+    saveLocalArchive(archiveObj);
+
+    // Update saldo awal akun
+    const accs = getLocalAccounts().map(a => {
+      const match = backupData.accounts.find(ba => ba.id === a.id);
+      return match ? { ...a, initialBalance: match.initialBalance } : a;
+    });
+    saveLocalAccounts(accs);
+  }
+
+  saveLocalTransactions(remainingTx);
+  return { archived: txYear.length, newYear: year + 1 };
+};
+
+export const apiYearlyRestore = async (year: number): Promise<{ restoredCount: number }> => {
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    const json = await safeRequest(YEARLY_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'restoreArchive', year }),
+    });
+    if (json && json.success) {
+      return { restoredCount: json.restoredCount };
+    }
+    throw new Error(json?.error || 'Gagal restore arsip dari server.');
+  }
+
+  const local = getLocalArchives().find(a => a.year === year);
+  if (!local) throw new Error('Arsip lokal tidak ditemukan.');
+
+  const txs = local.data.transactions || [];
+  const current = getLocalTransactions();
+  const currentIds = new Set(current.map(t => t.id));
+  const toAdd = txs.filter(t => !currentIds.has(t.id));
+
+  saveLocalTransactions([...toAdd, ...current]);
+  return { restoredCount: toAdd.length };
 };
