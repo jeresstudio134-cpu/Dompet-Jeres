@@ -15,11 +15,13 @@ import {
   ArrowUpDown,
   ChevronDown,
   Settings,
-  Check
+  Check,
+  Printer
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Transaction, Account, TransactionType, FilterState, MonthlyStats, NeonConfig } from '../types/finance.ts';
 import { formatRupiah, getCurrentDateIndo, formatTanggalIndo, parseRupiahInput } from '../utils/formatters.ts';
+import { escapeHtml, printHtml } from '../utils/printReport.ts';
 
 // Pindah kategori disimpan sebagai dua baris berawalan "kt-":
 // keluar dari kategori asal dan masuk ke kategori tujuan, di akun yang sama (saldo akun tidak berubah)
@@ -544,6 +546,208 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     });
   }, [transactions, sortOrder]);
 
+  const handlePrintFilter = () => {
+    if (!isAdmin) {
+      onOpenAdminModal();
+      return;
+    }
+
+    if (filteredList.length === 0) {
+      alert('Belum ada transaksi pada filter yang dipilih untuk dicetak.');
+      return;
+    }
+
+    const now = new Date();
+    const waktuCetak =
+      now.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }) +
+      ', ' +
+      now.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+
+    const storeTitle = currentStoreName || 'Dompet Toko';
+
+    const counted = filteredList.filter(t => {
+      if (t.category === 'Pindah Saldo') return filter.category === 'Pindah Saldo';
+      if (isCatTransfer(t)) return filter.category !== 'ALL';
+      return true;
+    });
+    const totalMasuk = counted.filter(t => t.type === 'masuk').reduce((sum, t) => sum + t.amount, 0);
+    const totalKeluar = counted.filter(t => t.type === 'keluar').reduce((sum, t) => sum + t.amount, 0);
+    const sisa = totalMasuk - totalKeluar;
+
+    const periodeLabel = filter.monthYear === 'ALL' ? 'Semua Periode' : filter.monthYear;
+    const rentangLabel =
+      filter.dateFrom || filter.dateTo
+        ? `${filter.dateFrom ? formatTanggalIndo(filter.dateFrom) : 'Awal'} s/d ${
+            filter.dateTo ? formatTanggalIndo(filter.dateTo) : 'Sekarang'
+          }`
+        : 'Semua Tanggal';
+    const kategoriLabel =
+      filter.category === 'ALL'
+        ? 'Semua Kantong'
+        : filter.category === 'EMPTY'
+        ? 'Tanpa Kategori'
+        : filter.category;
+    const akunLabel = filter.accountId === 'ALL' ? 'Semua Akun' : getAccountName(filter.accountId);
+    const jenisLabel =
+      filter.type === 'ALL' ? 'Semua Jenis' : filter.type === 'masuk' ? 'Pemasukan Saja' : 'Pengeluaran Saja';
+
+    const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Laporan Transaksi - ${escapeHtml(storeTitle)}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 14mm 12mm 16mm 12mm;
+      @bottom-right {
+        content: "Hal. " counter(page) " / " counter(pages);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9px;
+        color: #555;
+      }
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10.5px;
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
+      margin: 0;
+      padding: 0;
+    }
+    thead { display: table-header-group; }
+    tfoot { display: table-row-group; }
+    tr { page-break-inside: avoid; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <!-- Kop Toko -->
+  <table style="width: 100%; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 10px;">
+    <tr>
+      <td style="vertical-align: bottom; text-align: left;">
+        <div style="font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #111;">
+          ${escapeHtml(storeTitle)}
+        </div>
+        <div style="font-size: 12px; font-weight: bold; color: #333; margin-top: 2px;">
+          LAPORAN TRANSAKSI (FILTER)
+        </div>
+      </td>
+      <td style="vertical-align: bottom; text-align: right; font-size: 9.5px; color: #444;">
+        <div>Waktu Cetak:</div>
+        <div style="font-weight: bold; color: #111;">${escapeHtml(waktuCetak)}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Filter Criteria & Summary Side by Side -->
+  <table style="width: 100%; border-collapse: separate; border-spacing: 10px 0; margin-bottom: 12px;">
+    <tr>
+      <!-- Kriteria Filter -->
+      <td style="width: 50%; vertical-align: top; border: 1px solid #bbb; border-radius: 4px; padding: 6px 8px; background-color: #fafafa; font-size: 9.5px;">
+        <div style="font-weight: bold; font-size: 10.5px; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 4px; text-transform: uppercase;">
+          Kriteria Filter
+        </div>
+        <div><b>Periode:</b> ${escapeHtml(periodeLabel)}</div>
+        <div><b>Rentang:</b> ${escapeHtml(rentangLabel)}</div>
+        <div><b>Kantong:</b> ${escapeHtml(kategoriLabel)}</div>
+        <div><b>Akun:</b> ${escapeHtml(akunLabel)} | <b>Jenis:</b> ${escapeHtml(jenisLabel)}</div>
+      </td>
+
+      <!-- Ringkasan Hasil -->
+      <td style="width: 50%; vertical-align: top; border: 1px solid #bbb; border-radius: 4px; padding: 6px 8px; background-color: #fafafa; font-size: 9.5px;">
+        <div style="font-weight: bold; font-size: 10.5px; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 4px; text-transform: uppercase;">
+          Ringkasan (${filteredList.length} Transaksi)
+        </div>
+        <table style="width: 100%; font-size: 9.5px;">
+          <tr>
+            <td>Total Masuk:</td>
+            <td style="text-align: right; font-weight: bold; font-variant-numeric: tabular-nums;">${formatRupiah(totalMasuk)}</td>
+          </tr>
+          <tr>
+            <td>Total Keluar:</td>
+            <td style="text-align: right; font-weight: bold; font-variant-numeric: tabular-nums;">${formatRupiah(totalKeluar)}</td>
+          </tr>
+          <tr style="border-top: 1px dashed #ccc; font-weight: bold;">
+            <td>Sisa Saldo:</td>
+            <td style="text-align: right; font-variant-numeric: tabular-nums;">${sisa < 0 ? '-' : ''}${formatRupiah(Math.abs(sisa))}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Tabel Transaksi -->
+  <table style="width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 10px;">
+    <thead>
+      <tr style="background-color: #f1f3f5; color: #111;">
+        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 28px; text-align: center;">No</th>
+        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 75px; text-align: left;">Tanggal</th>
+        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 80px; text-align: left;">Akun</th>
+        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 95px; text-align: left;">Kantong</th>
+        <th style="border: 1px solid #ccc; padding: 4px 5px; text-align: left;">Keterangan</th>
+        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 85px; text-align: right;">Masuk</th>
+        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 85px; text-align: right;">Keluar</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filteredList
+        .map(
+          (t, idx) => `
+        <tr>
+          <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: center;">${idx + 1}</td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(formatTanggalIndo(t.date))}</td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(getAccountName(t.accountId))}</td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(t.category || '-')}</td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(t.description)}</td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">
+            ${t.type === 'masuk' ? formatRupiah(t.amount) : '-'}
+          </td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">
+            ${t.type === 'keluar' ? formatRupiah(t.amount) : '-'}
+          </td>
+        </tr>
+      `
+        )
+        .join('')}
+    </tbody>
+    <tfoot>
+      <tr style="background-color: #f8f9fa; font-weight: bold;">
+        <td colspan="5" style="border: 1px solid #ccc; padding: 4px 5px; text-align: right;">Total:</td>
+        <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
+          totalMasuk
+        )}</td>
+        <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
+          totalKeluar
+        )}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Footer -->
+  <div style="margin-top: 14px; padding-top: 6px; border-top: 1px solid #ccc; font-size: 9px; color: #555; text-align: center;">
+    Dokumen ini dibuat otomatis oleh aplikasi pada ${escapeHtml(waktuCetak)}.
+  </div>
+</body>
+</html>`;
+
+    printHtml(html, `Laporan Transaksi - ${storeTitle}`);
+  };
+
   return (
     <div className="w-full space-y-3.5">
       
@@ -856,10 +1060,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               />
             </div>
 
-            {/* Kantong (wajib diisi) */}
+            {/* Kantong */}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Kantong <span className="text-rose-500 font-bold">*</span> <span className="text-[10px] text-slate-400 font-normal">(wajib dipilih)</span>
+                Kantong
               </label>
 
               <select
@@ -878,11 +1082,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     setKategori(e.target.value);
                   }
                 }}
-                className={`w-full bg-white text-xs sm:text-sm rounded-lg px-3 py-2 border ${
-                  !kategori ? 'border-amber-300 text-slate-500' : 'border-slate-300 text-slate-700'
-                } focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer`}
+                className="w-full bg-white text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer"
               >
-                <option value="" disabled>— Pilih Kantong (wajib) —</option>
+                <option value="" disabled>— Pilih Kantong —</option>
                 {allCategories.map(cat => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -892,13 +1094,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 <option value="__NEW__" className="font-bold text-[#1e3a5f]">
                   +Tambah Kantong
                 </option>
-                {isAdmin ? (
+                {isAdmin && (
                   <option value="__MANAGE__" className="font-bold text-rose-600">
                     -Hapus Kantong (Admin)
-                  </option>
-                ) : (
-                  <option value="__LOCKED_MANAGE__" className="text-slate-400">
-                    🔒 Hapus Kantong (Perlu PIN Admin)
                   </option>
                 )}
               </select>
@@ -1004,19 +1202,6 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             >
               SIMPAN
             </button>
-
-            {/* Batalkan transaksi terakhir - Hanya di Mode Admin */}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={onUndoLast}
-                disabled={transactions.length === 0}
-                className="w-full py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 hover:text-slate-800 font-medium text-xs transition disabled:opacity-40 cursor-pointer"
-              >
-                Batalkan transaksi terakhir
-              </button>
-            )}
-
           </form>
         )}
 
@@ -1166,17 +1351,6 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 >
                   PINDAH KATEGORI
                 </button>
-
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={onUndoLast}
-                    disabled={transactions.length === 0}
-                    className="w-full py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 hover:text-slate-800 font-medium text-xs transition disabled:opacity-40 cursor-pointer"
-                  >
-                    Batalkan transaksi terakhir
-                  </button>
-                )}
               </form>
             ) : (
               <form onSubmit={handlePindahSaldo} className="space-y-3.5">
@@ -1289,19 +1463,6 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 >
                   PINDAH SALDO
                 </button>
-
-                {/* Batalkan transaksi terakhir - Hanya di Mode Admin */}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={onUndoLast}
-                    disabled={transactions.length === 0}
-                    className="w-full py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 hover:text-slate-800 font-medium text-xs transition disabled:opacity-40 cursor-pointer"
-                  >
-                    Batalkan transaksi terakhir
-                  </button>
-                )}
-
               </form>
             )}
           </div>
@@ -1618,13 +1779,25 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               </div>
             )}
 
-            <button
-              onClick={onOpenExportImport}
-              className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              {isAdmin ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-amber-300" />}
-              <span>{isAdmin ? 'Ekspor Hasil Filter ke Excel' : 'Ekspor Hasil Filter ke Excel (Perlu PIN Admin)'}</span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handlePrintFilter}
+                className="w-full py-2.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+              >
+                {isAdmin ? <Printer className="w-3.5 h-3.5 text-slate-700" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
+                <span>{isAdmin ? 'Cetak Hasil Filter' : 'Cetak Filter (Perlu PIN Admin)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenExportImport}
+                className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                {isAdmin ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-amber-300" />}
+                <span>{isAdmin ? 'Ekspor ke Excel' : 'Ekspor ke Excel (Perlu PIN Admin)'}</span>
+              </button>
+            </div>
 
           </div>
         )}
@@ -1906,7 +2079,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               {/* Kantong */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kantong <span className="text-rose-500 font-bold">*</span> <span className="text-[10px] text-slate-400 font-normal">(wajib)</span>
+                  Kantong
                 </label>
                 <select
                   required
@@ -1914,7 +2087,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   onChange={(e) => setEditKategori(e.target.value)}
                   className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-xl px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                 >
-                  <option value="" disabled>— Pilih Kantong (wajib) —</option>
+                  <option value="" disabled>— Pilih Kantong —</option>
                   {allCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
