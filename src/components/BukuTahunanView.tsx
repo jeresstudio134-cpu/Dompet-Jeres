@@ -876,47 +876,41 @@ export const BukuTahunanView: React.FC<BukuTahunanViewProps> = ({
         )}
       </div>
 
-      {/* J & K. TOMBOL AKSI UTAMA */}
+      {/* J & K. TOMBOL AKSI UTAMA (Hanya Admin) */}
       <div className="space-y-2 pt-1">
-        {/* Tombol Download Laporan & Backup (selalu bisa diunduh) */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={handleDownloadBackup}
-            className="py-2.5 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Download Backup (JSON+XLS)</span>
-          </button>
+        {/* Tombol Download Laporan & Backup (Hanya Admin) */}
+        {isAdmin && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadBackup}
+              className="py-2.5 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>Download Backup (JSON+XLS)</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleDownloadReport}
-            className="py-2.5 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Laporan Excel {selectedYear}</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleDownloadReport}
+              className="py-2.5 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Laporan Excel {selectedYear}</span>
+            </button>
+          </div>
+        )}
 
-        {/* Kondisi 1: Tahun yang dipilih adalah tahun berjalan & belum tutup buku */}
-        {!isArchiveSelected && (
+        {/* Kondisi 1: Tahun yang dipilih adalah tahun berjalan & belum tutup buku (Hanya Admin) */}
+        {!isArchiveSelected && isAdmin && (
           <button
             type="button"
-            onClick={() => {
-              if (!isAdmin) {
-                onOpenAdminModal();
-                return;
-              }
-              setIsTutupBukuOpen(true);
-            }}
+            onClick={() => setIsTutupBukuOpen(true)}
             className="w-full py-3 bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-[0.99]"
           >
             <Lock className="w-4 h-4" />
             <span>
-              {isAdmin
-                ? `Tutup Buku Tahun ${selectedYear} & Mulai ${selectedYear + 1}`
-                : `Tutup Buku Tahun ${selectedYear} (Perlu PIN Admin)`}
+              Tutup Buku Tahun {selectedYear} & Mulai {selectedYear + 1}
             </span>
           </button>
         )}
