@@ -366,8 +366,29 @@ export default function App() {
   };
 
   // Muat semua data dari database
+    const CACHE_KEY = 'dompet_cache_v1';
+
+  // Muat semua data: tampilkan data tersimpan dulu, lalu segarkan dari database
   const loadAll = async () => {
-    setIsLoading(true);
+    let hasCache = false;
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const c = JSON.parse(raw);
+        if (Array.isArray(c.accounts) && Array.isArray(c.transactions)) {
+          setAccounts(c.accounts);
+          setTransactions(c.transactions);
+          setCategories(Array.isArray(c.categories) ? c.categories : []);
+          if (c.storeName) setStoreName(c.storeName);
+          hasCache = true;
+          setIsLoading(false);
+        }
+      }
+    } catch {
+      /* cache rusak, abaikan */
+    }
+
+    if (!hasCache) setIsLoading(true);
     setLoadError(null);
     const slowTimer = setTimeout(() => setLoadSlow(true), 5000);
     try {
@@ -389,23 +410,34 @@ export default function App() {
       setTransactions(data.transactions);
       setCategories(cats);
       if (data.storeName && data.storeName.trim()) setStoreName(data.storeName.trim());
+      setIsLoading(false);
 
-      // Muat data utang-piutang (non-blocking)
-      try {
-        const loadedDebts = await apiLoadDebts();
-        setDebts(loadedDebts);
-      } catch (debtErr) {
-        console.warn('Gagal memuat utang-piutang:', debtErr);
-      }
+      // Utang-piutang dimuat di belakang, tidak menahan layar utama
+      apiLoadDebts()
+        .then(setDebts)
+        .catch(err => console.warn('Gagal memuat utang-piutang:', err));
     } catch (e: any) {
       console.error(e);
-      setLoadError(e.message || 'Gagal memuat data dari database.');
+      if (!hasCache) setLoadError(e.message || 'Gagal memuat data dari database.');
     } finally {
       clearTimeout(slowTimer);
       setLoadSlow(false);
       setIsLoading(false);
     }
   };
+
+  // Simpan salinan terbaru agar pembukaan berikutnya langsung tampil
+  useEffect(() => {
+    if (isLoading || accounts.length === 0) return;
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ accounts, transactions, categories, storeName })
+      );
+    } catch {
+      /* penyimpanan penuh, abaikan */
+    }
+  }, [accounts, transactions, categories, storeName, isLoading]);
 
   useEffect(() => {
     loadAll();

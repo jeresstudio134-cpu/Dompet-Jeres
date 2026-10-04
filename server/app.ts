@@ -11,13 +11,14 @@ export function createApp() {
 
   // Tanpa CORS: aplikasi dan API berada di domain yang sama
   app.use('/api', async (_req, _res, next) => {
-    try {
-      await ensureSchema();
-      next();
-    } catch (err) {
-      next(err);
-    }
-  });
+  if (process.env.SKIP_ENSURE_SCHEMA === '1') return next();
+  try {
+    await ensureSchema();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
   app.use('/api', adminContext);
 
   app.get('/api/warmup', (_req, res) => {
