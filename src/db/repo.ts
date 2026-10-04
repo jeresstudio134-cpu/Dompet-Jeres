@@ -1,4 +1,4 @@
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, desc, asc, sql as dsql } from 'drizzle-orm';
 import { db, sql, schema, isNeonConfigured } from './index.ts';
 import { loadLocalData, saveLocalData } from './store.ts';
 import type {
@@ -287,12 +287,12 @@ export async function getTransactions(): Promise<Transaction[]> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    const rows = await db
+        const rows = await db
       .select()
       .from(schema.transactions)
       .orderBy(
         desc(schema.transactions.date),
-        desc(schema.transactions.no),
+        dsql`${schema.transactions.no} DESC NULLS LAST`,
         desc(schema.transactions.id),
       );
 
