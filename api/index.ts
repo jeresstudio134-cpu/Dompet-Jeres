@@ -1,5 +1,5 @@
 // api/index.ts
 // Entry point untuk Vercel Serverless Function
-import app from '../server.ts';
+import { createApp } from '../server/app.js';
 
-export default app;
+export default createApp();

@@ -37,7 +37,7 @@ export function verifyToken(token?: string): boolean {
 }
 
 // Middleware: isi req.isAdmin dari header token
-export function attachAdmin(req: Request, _res: Response, next: NextFunction) {
+export function adminContext(req: Request, _res: Response, next: NextFunction) {
   const auth = String(req.headers.authorization || '');
   const token = auth.startsWith('Bearer ')
     ? auth.slice(7)
