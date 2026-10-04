@@ -15,6 +15,7 @@ import {
   CircleDollarSign,
   Clock,
   Sparkles,
+  Lock,
 } from 'lucide-react';
 import { AutoDebtModal } from './AutoDebtModal.tsx';
 import { Debt, DebtType, DebtPayment, Account } from '../types/finance.ts';
@@ -430,14 +431,30 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                   {/* Action Buttons */}
                   <div className="mt-2.5 flex items-center gap-1.5">
                     {!lunas && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenPay(debt)}
-                        className="flex-1 py-1.5 rounded-lg bg-[#1b7a4b] hover:bg-[#156a40] text-white text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <CircleDollarSign className="w-3.5 h-3.5" />
-                        Bayar / Angsur
-                      </button>
+                      isAdmin ? (
+                        // Mode Admin: tombol aktif
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPay(debt)}
+                          className="flex-1 py-1.5 rounded-lg bg-[#1b7a4b] hover:bg-[#156a40] text-white text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <CircleDollarSign className="w-3.5 h-3.5" />
+                          Bayar / Angsur
+                        </button>
+                      ) : (
+                        // Mode Kasir: tombol terkunci
+                        <button
+                          type="button"
+                          onClick={() => {
+                            alert('Hanya Admin yang dapat mencatat pembayaran. Masukkan PIN Admin di header Dompet Toko.');
+                          }}
+                          className="flex-1 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-500 text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                          title="Hanya Admin yang dapat mencatat pembayaran"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          Bayar (Hanya Admin)
+                        </button>
+                      )
                     )}
                     <button
                       type="button"
