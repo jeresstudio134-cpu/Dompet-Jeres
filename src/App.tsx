@@ -55,7 +55,7 @@ export default function App() {
   // 1. Core State
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [storeName, setStoreName] = useState<string>('Dompet Toko');
+  const [storeName, setStoreName] = useState<string>('Dompet');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadSlow, setLoadSlow] = useState<boolean>(false);
@@ -800,7 +800,7 @@ export default function App() {
             }`}
           >
             <Wallet className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Dompet Toko</span>
+            <span className="text-[10px] font-bold">Dompet</span>
             {mainView === 'dompet' && (
               <span className="absolute bottom-0 w-12 h-0.5 bg-[#1e3a5f] rounded-full" />
             )}
