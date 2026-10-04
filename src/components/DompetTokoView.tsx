@@ -82,7 +82,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   onLogoutAdmin,
   storeName,
 }) => {
-  const currentStoreName = storeName || 'Dompet Toko';
+  const currentStoreName = storeName || 'Dompet Keuangan';
 
   // Tabs: 'catat' | 'pindah' | 'filter'
   const [activeTab, setActiveTab] = useState<'catat' | 'pindah' | 'filter'>('catat');
@@ -531,40 +531,38 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   return (
     <div className="w-full space-y-3.5">
       
-      {/* Title & Header Toolbar */}
-      <div className="flex items-center justify-between pt-1 pb-0.5">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-extrabold text-[#1e3a5f] tracking-tight">
-            {currentStoreName}
-          </h1>
-          
-          {/* Admin / Kasir Mode Toggle Badge */}
+                  {/* Title & Header Toolbar */}
+      <div className="flex items-start justify-between gap-2 pt-1 pb-0.5">
+        {/* Kiri: Judul (bisa 2 baris) */}
+        <h1 className="text-lg sm:text-xl font-extrabold text-[#1e3a5f] tracking-tight leading-tight flex-1 min-w-0">
+          {currentStoreName}
+        </h1>
+
+        {/* Kanan: Badge Admin + Tombol (1 baris) */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={onOpenAdminModal}
-            className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer ${
-              isAdmin 
-                ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 shadow-2xs' 
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition cursor-pointer whitespace-nowrap shrink-0 ${
+              isAdmin
+                ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
             }`}
-            title={isAdmin ? 'Mode Admin aktif (Klik untuk kunci / ubah PIN)' : 'Mode Kasir (Klik untuk masuk Mode Admin)'}
+            title={isAdmin ? 'Admin Aktif (Klik untuk kunci / ubah PIN)' : 'Mode Kasir (Klik untuk login Admin)'}
           >
             {isAdmin ? (
               <>
-                <ShieldCheck className="w-3 h-3 text-amber-700" />
-                <span>Admin Aktif</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <span>Admin</span>
               </>
             ) : (
               <>
-                <Lock className="w-3 h-3 text-slate-500" />
+                <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>Kasir</span>
               </>
             )}
           </button>
-        </div>
-        
-        <div className="flex items-center gap-1.5">
-          {/* Smart Auto-record Trigger */}
+
           <button
             onClick={onOpenAutoRecord}
             title="Catat Otomatis dari Teks / Foto Struk"
@@ -574,7 +572,6 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             <span>Otomatis</span>
           </button>
 
-          {/* Neon Postgres / Vercel Indicator */}
           <button
             onClick={onOpenNeonModal}
             title={neonConfig.isConnected ? 'Neon DB Terhubung' : 'Konfigurasi Neon DB & Vercel'}
@@ -587,7 +584,6 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             <Database className="w-4 h-4" />
           </button>
 
-          {/* Export / Import */}
           <button
             onClick={onOpenExportImport}
             title="Ekspor ke Excel / Backup Data"
