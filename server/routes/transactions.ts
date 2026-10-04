@@ -128,6 +128,7 @@ async function upsertAccount(acc: any) {
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
+    res.set('Cache-Control', 'no-store, max-age=0');
     const db = getDb();
     const [txRows, accRows, catRows, storeName] = await Promise.all([
       db
