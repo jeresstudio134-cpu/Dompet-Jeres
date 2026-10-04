@@ -547,10 +547,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   }, [transactions, sortOrder]);
 
   const handlePrintFilter = () => {
-    if (!isAdmin) {
-      onOpenAdminModal();
-      return;
-    }
+    
 
     if (filteredList.length === 0) {
       alert('Belum ada transaksi pada filter yang dipilih untuk dicetak.');
@@ -1785,8 +1782,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 onClick={handlePrintFilter}
                 className="w-full py-2.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
               >
-                {isAdmin ? <Printer className="w-3.5 h-3.5 text-slate-700" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
-                <span>{isAdmin ? 'Cetak Hasil Filter' : 'Cetak Filter (Perlu PIN Admin)'}</span>
+                <Printer className="w-3.5 h-3.5 text-slate-700" />
+                <span>Cetak Hasil Filter</span>
               </button>
 
               <button
@@ -1794,8 +1791,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 onClick={onOpenExportImport}
                 className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                {isAdmin ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-amber-300" />}
-                <span>{isAdmin ? 'Ekspor ke Excel' : 'Ekspor ke Excel (Perlu PIN Admin)'}</span>
+                <Download className="w-3.5 h-3.5" />
+                <span>Ekspor ke Excel</span>
               </button>
             </div>
 
