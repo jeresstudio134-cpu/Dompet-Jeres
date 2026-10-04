@@ -696,7 +696,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-100/90 flex items-center justify-center text-sm font-semibold text-slate-500">
+      <div className="min-h-dvh bg-slate-100/90 flex items-center justify-center text-sm font-semibold text-slate-500">
         <div className="text-center space-y-1">
           <p>Memuat data...</p>
           {loadSlow && (
@@ -711,7 +711,7 @@ export default function App() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-slate-100/90 flex flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="min-h-dvh bg-slate-100/90 flex flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm font-semibold text-rose-700">Gagal memuat data dari database.</p>
         <p className="text-xs text-slate-500 break-words max-w-xs">{loadError}</p>
         <button
@@ -726,7 +726,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/90 text-slate-800 flex flex-col antialiased selection:bg-emerald-600 selection:text-white">
+    <div className="min-h-dvh bg-slate-100/90 text-slate-800 flex flex-col antialiased selection:bg-emerald-600 selection:text-white">
       
       {/* Toast Notification */}
       {toast && (
@@ -744,7 +744,7 @@ export default function App() {
       )}
 
       {/* Main Content View */}
-      <main className="flex-1 w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
+      <main className="flex-1 w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto px-3 sm:px-4 py-5 sm:py-8 pb-24">
         {mainView === 'dompet' && (
           <DompetTokoView
             accounts={accounts}
@@ -788,7 +788,7 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation */}
-      <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-sm border-t border-slate-200 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t border-slate-200 shadow-lg">
         <div className="max-w-md sm:max-w-lg md:max-w-xl mx-auto grid grid-cols-2">
           <button
             type="button"
