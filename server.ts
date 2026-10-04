@@ -777,6 +777,10 @@ app.post('/api/yearly', async (req: Request, res: Response) => {
 // ============================================
 
 async function setupFrontend() {
+  if (process.env.VERCEL) {
+    // Di Vercel, file statis dilayani langsung oleh Vercel CDN dari folder dist
+    return;
+  }
   if (process.env.NODE_ENV !== 'production') {
     // Mode Development: jalankan Vite middleware
     try {
@@ -802,9 +806,9 @@ async function setupFrontend() {
 
 setupFrontend();
 
-// Jalankan HTTP Server bila dijalankan langsung
+// Jalankan HTTP Server bila dijalankan langsung (bukan di Vercel Serverless Function)
 const PORT = process.env.PORT || 3000;
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 Server Dompet Jeres aktif di port ${PORT}`);
   });
