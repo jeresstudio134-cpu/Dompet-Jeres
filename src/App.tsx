@@ -726,7 +726,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-100/90 text-slate-800 antialiased selection:bg-emerald-600 selection:text-white">
+    <div className="h-dvh bg-slate-100/90 text-slate-800 flex flex-col overflow-hidden antialiased selection:bg-emerald-600 selection:text-white">
       
       {/* Toast Notification */}
       {toast && (
@@ -743,8 +743,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content View */}
-      <main className="w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto px-3 sm:px-4 py-5 sm:py-8 pb-24">
+      {/* Main Content View (scrollable) */}
+      <main className="flex-1 w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto px-3 sm:px-4 py-5 sm:py-8 overflow-y-auto">
         {mainView === 'dompet' && (
           <DompetTokoView
             accounts={accounts}
@@ -787,16 +787,16 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <div 
-  className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t border-slate-200 shadow-lg"
-  style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
->
+      {/* Bottom Navigation (fixed, always at bottom) */}
+      <div
+        className="flex-shrink-0 w-full bg-white border-t border-slate-200 shadow-lg z-30"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <div className="max-w-md sm:max-w-lg md:max-w-xl mx-auto grid grid-cols-2">
           <button
             type="button"
             onClick={() => setMainView('dompet')}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2.5 transition cursor-pointer ${
+            className={`relative flex flex-col items-center justify-center gap-0.5 py-2.5 transition cursor-pointer ${
               mainView === 'dompet'
                 ? 'text-[#1e3a5f]'
                 : 'text-slate-400 hover:text-slate-600'
@@ -812,7 +812,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setMainView('utang')}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2.5 transition cursor-pointer relative ${
+            className={`relative flex flex-col items-center justify-center gap-0.5 py-2.5 transition cursor-pointer ${
               mainView === 'utang'
                 ? 'text-[#1e3a5f]'
                 : 'text-slate-400 hover:text-slate-600'
