@@ -14,7 +14,8 @@ import {
   X,
   ArrowUpDown,
   ChevronDown,
-  Check // <--- Tambahkan ini
+  Settings,
+  Check
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Transaction, Account, TransactionType, FilterState, MonthlyStats, NeonConfig } from '../types/finance.ts';
@@ -538,8 +539,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           {currentStoreName}
         </h1>
 
-        {/* Kanan: Badge Admin + Tombol (1 baris) */}
+        {/* Kanan: Tombol Admin/Kasir + Tombol Aksi */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Tombol Admin/Kasir — klik untuk buka modal pengaturan */}
           <button
             type="button"
             onClick={onOpenAdminModal}
@@ -548,7 +550,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
             }`}
-            title={isAdmin ? 'Admin Aktif (Klik untuk kunci / ubah PIN)' : 'Mode Kasir (Klik untuk login Admin)'}
+            title={isAdmin ? 'Pengaturan Admin (klik untuk buka)' : 'Login Admin (klik untuk buka)'}
           >
             {isAdmin ? (
               <>
@@ -566,7 +568,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           <button
             onClick={onOpenAutoRecord}
             title="Catat Otomatis dari Teks / Foto Struk"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-xs transition"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-xs transition cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 animate-pulse" />
             <span>Otomatis</span>
@@ -575,7 +577,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           <button
             onClick={onOpenNeonModal}
             title={neonConfig.isConnected ? 'Neon DB Terhubung' : 'Konfigurasi Neon DB & Vercel'}
-            className={`p-1.5 rounded-md border text-xs transition ${
+            className={`p-1.5 rounded-md border text-xs transition cursor-pointer ${
               neonConfig.isConnected
                 ? 'bg-cyan-50 border-cyan-300 text-cyan-700 hover:bg-cyan-100'
                 : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -587,7 +589,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           <button
             onClick={onOpenExportImport}
             title="Ekspor ke Excel / Backup Data"
-            className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs transition"
+            className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs transition cursor-pointer"
           >
             <Download className="w-4 h-4" />
           </button>
