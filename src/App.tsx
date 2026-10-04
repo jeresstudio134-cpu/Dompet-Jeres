@@ -321,9 +321,10 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   const handleLoginAdminSuccess = () => {
-    setIsAdmin(true);
-    showToast('Akses Admin Aktif! Fitur hapus data & pengeditan terbuka.', 'success');
-  };
+  setIsAdmin(true);
+  setIsAdminModalOpen(false); // <-- TAMBAHKAN: tutup modal setelah login
+  showToast('Akses Admin Aktif! Fitur hapus data & pengeditan terbuka.', 'success');
+};
 
   const handleLogoutAdmin = () => {
     clearAdminToken();
