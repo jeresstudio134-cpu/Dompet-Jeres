@@ -322,15 +322,12 @@ export default function App() {
 
   const handleLoginAdminSuccess = () => {
   setIsAdmin(true);
-  setIsAdminModalOpen(false); // <-- TAMBAHKAN: tutup modal setelah login
-  showToast('Akses Admin Aktif! Fitur hapus data & pengeditan terbuka.', 'success');
 };
 
   const handleLogoutAdmin = () => {
-    clearAdminToken();
-    setIsAdmin(false);
-    showToast('Mode Kasir aktif. Pengeditan dan penghapusan data dikunci.', 'info');
-  };
+  clearAdminToken();
+  setIsAdmin(false);
+};
 
   useEffect(() => {
     const onExpired = () => {
