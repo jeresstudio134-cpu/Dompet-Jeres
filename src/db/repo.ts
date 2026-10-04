@@ -1,16 +1,25 @@
-// src/db/repo.ts
 import { eq, desc, asc } from 'drizzle-orm';
 import { db, sql, schema, isNeonConfigured } from './index.ts';
 import { loadLocalData, saveLocalData } from './store.ts';
-import type { Account, Transaction, Debt, DebtPayment, YearlyArchive } from '../types/finance.ts';
+import type {
+  Account,
+  Transaction,
+  Debt,
+  DebtPayment,
+  YearlyArchive,
+} from '../types/finance.ts';
 
 let isDbReady = false;
 let useNeon = isNeonConfigured;
 
+function logError(message: string, err: unknown) {
+  console.error(message, err);
+}
+
 export async function ensureDatabaseTables(): Promise<void> {
   if (isDbReady) return;
 
-  // Pastikan data lokal selalu terinisialisasi
+  // Inisialisasi penyimpanan lokal untuk mode tanpa Neon.
   loadLocalData();
 
   if (useNeon && sql) {
@@ -94,13 +103,16 @@ export async function ensureDatabaseTables(): Promise<void> {
           );
         `,
       ]);
+
       console.log('✅ Neon Postgres tables verified.');
-    } catch (err: any) {
-      console.warn('⚠️ Neon Postgres tidak dapat dihubungi, beralih ke penyimpanan lokal:', err.message || err);
-      useNeon = false;
+    } catch (err) {
+      logError('❌ Gagal menyiapkan tabel Neon:', err);
+      // Jangan diam-diam beralih ke lokal jika Neon sudah dikonfigurasi.
+      throw err;
     }
   } else {
     useNeon = false;
+    console.log('ℹ️ Neon tidak dikonfigurasi; memakai penyimpanan lokal.');
   }
 
   isDbReady = true;
@@ -114,17 +126,13 @@ export async function getSetting(key: string): Promise<string | null> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    try {
-      const rows = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, key))
-        .limit(1);
-      if (rows.length > 0) return rows[0].value;
-      return null;
-    } catch (err) {
-      console.warn(`Fallback getSetting(${key}) ke local:`, err);
-    }
+    const rows = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, key))
+      .limit(1);
+
+    return rows[0]?.value ?? null;
   }
 
   const local = loadLocalData();
@@ -134,40 +142,33 @@ export async function getSetting(key: string): Promise<string | null> {
 export async function setSetting(key: string, value: string): Promise<void> {
   await ensureDatabaseTables();
 
-  // Simpan ke local
+  if (useNeon && db) {
+    await db
+      .insert(schema.settings)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value, updatedAt: new Date() },
+      });
+    return;
+  }
+
   const local = loadLocalData();
   local.settings[key] = value;
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db
-        .insert(schema.settings)
-        .values({ key, value, updatedAt: new Date() })
-        .onConflictDoUpdate({
-          target: schema.settings.key,
-          set: { value, updatedAt: new Date() },
-        });
-    } catch (err) {
-      console.warn(`Gagal simpan setting ${key} ke Neon:`, err);
-    }
-  }
 }
 
 export async function deleteSetting(key: string): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    await db.delete(schema.settings).where(eq(schema.settings.key, key));
+    return;
+  }
+
   const local = loadLocalData();
   delete local.settings[key];
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.settings).where(eq(schema.settings.key, key));
-    } catch (err) {
-      console.warn(`Gagal delete setting ${key} di Neon:`, err);
-    }
-  }
 }
 
 // ============================================
@@ -178,116 +179,125 @@ export async function getAccounts(): Promise<Account[]> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    try {
-      const rows = await db.select().from(schema.accounts).orderBy(asc(schema.accounts.id));
-      if (rows.length > 0) {
-        return rows.map(a => ({
-          id: a.id,
-          name: a.name,
-          type: a.type as 'cash' | 'bank' | 'ewallet',
-          color: a.color || '#0284c7',
-          iconName: a.iconName || 'Wallet',
-          initialBalance: Number(a.initialBalance) || 0,
-        }));
-      }
-    } catch (err) {
-      console.warn('Fallback getAccounts ke local:', err);
-    }
+    const rows = await db
+      .select()
+      .from(schema.accounts)
+      .orderBy(asc(schema.accounts.id));
+
+    return rows.map(a => ({
+      id: a.id,
+      name: a.name,
+      type: a.type as 'cash' | 'bank' | 'ewallet',
+      color: a.color || '#0284c7',
+      iconName: a.iconName || 'Wallet',
+      initialBalance: Number(a.initialBalance) || 0,
+    }));
   }
 
-  const local = loadLocalData();
-  return local.accounts;
+  return loadLocalData().accounts;
 }
 
 export async function saveAccount(acc: Account): Promise<void> {
   await ensureDatabaseTables();
 
-  const local = loadLocalData();
-  const idx = local.accounts.findIndex(a => a.id === acc.id);
-  if (idx >= 0) {
-    local.accounts[idx] = { ...acc };
-  } else {
-    local.accounts.push({ ...acc });
-  }
-  saveLocalData(local);
-
   if (useNeon && db) {
-    try {
-      await db
-        .insert(schema.accounts)
-        .values({
-          id: acc.id,
+    await db
+      .insert(schema.accounts)
+      .values({
+        id: acc.id,
+        name: acc.name,
+        type: acc.type,
+        color: acc.color || '#0284c7',
+        iconName: acc.iconName || 'Wallet',
+        initialBalance: Number(acc.initialBalance) || 0,
+      })
+      .onConflictDoUpdate({
+        target: schema.accounts.id,
+        set: {
           name: acc.name,
           type: acc.type,
           color: acc.color || '#0284c7',
           iconName: acc.iconName || 'Wallet',
           initialBalance: Number(acc.initialBalance) || 0,
-        })
-        .onConflictDoUpdate({
-          target: schema.accounts.id,
-          set: {
-            name: acc.name,
-            type: acc.type,
-            color: acc.color || '#0284c7',
-            iconName: acc.iconName || 'Wallet',
-            initialBalance: Number(acc.initialBalance) || 0,
-          },
-        });
-    } catch (err) {
-      console.warn('Gagal simpan akun ke Neon:', err);
-    }
+        },
+      });
+    return;
   }
+
+  const local = loadLocalData();
+  const idx = local.accounts.findIndex(a => a.id === acc.id);
+
+  if (idx >= 0) local.accounts[idx] = { ...acc };
+  else local.accounts.push({ ...acc });
+
+  saveLocalData(local);
 }
 
 export async function deleteAccount(id: string): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    await db.delete(schema.accounts).where(eq(schema.accounts.id, id));
+    return;
+  }
+
   const local = loadLocalData();
   local.accounts = local.accounts.filter(a => a.id !== id);
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.accounts).where(eq(schema.accounts.id, id));
-    } catch (err) {
-      console.warn('Gagal hapus akun di Neon:', err);
-    }
-  }
 }
 
 // ============================================
 // TRANSACTIONS
 // ============================================
 
+function mapTransaction(t: any): Transaction {
+  return {
+    id: t.id,
+    no: t.no || undefined,
+    date: t.date,
+    description: t.description,
+    accountId: t.accountId || '',
+    type: t.type as 'masuk' | 'keluar',
+    category: t.category,
+    amount: Number(t.amount) || 0,
+    notes: t.notes || undefined,
+    transferTargetAccountId: t.transferTargetAccountId || undefined,
+    linkedTransactionId: t.linkedTransactionId || undefined,
+    createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : undefined,
+  };
+}
+
+function transactionValues(tx: Transaction) {
+  return {
+    id: tx.id,
+    no: tx.no || null,
+    date: tx.date,
+    description: tx.description,
+    accountId: tx.accountId || null,
+    type: tx.type,
+    category: tx.category,
+    amount: Number(tx.amount) || 0,
+    notes: tx.notes || null,
+    transferTargetAccountId: tx.transferTargetAccountId || null,
+    linkedTransactionId: tx.linkedTransactionId || null,
+  };
+}
+
 export async function getTransactions(): Promise<Transaction[]> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    try {
-      const rows = await db.select().from(schema.transactions).orderBy(
+    const rows = await db
+      .select()
+      .from(schema.transactions)
+      .orderBy(
         desc(schema.transactions.date),
         desc(schema.transactions.no),
-        desc(schema.transactions.id)
+        desc(schema.transactions.id),
       );
-      if (rows.length > 0) {
-        return rows.map(t => ({
-          id: t.id,
-          no: t.no || undefined,
-          date: t.date,
-          description: t.description,
-          accountId: t.accountId || '',
-          type: t.type as 'masuk' | 'keluar',
-          category: t.category,
-          amount: Number(t.amount) || 0,
-          notes: t.notes || undefined,
-          transferTargetAccountId: t.transferTargetAccountId || undefined,
-          linkedTransactionId: t.linkedTransactionId || undefined,
-          createdAt: t.createdAt ? t.createdAt.toISOString() : undefined,
-        }));
-      }
-    } catch (err) {
-      console.warn('Fallback getTransactions ke local:', err);
-    }
+
+    // Tabel Neon kosong berarti hasilnya memang kosong.
+    return rows.map(mapTransaction);
   }
 
   const local = loadLocalData();
@@ -301,141 +311,95 @@ export async function getTransactions(): Promise<Transaction[]> {
 export async function saveTransaction(tx: Transaction): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    await db
+      .insert(schema.transactions)
+      .values(transactionValues(tx))
+      .onConflictDoUpdate({
+        target: schema.transactions.id,
+        set: transactionValues(tx),
+      });
+    return;
+  }
+
   const local = loadLocalData();
   const idx = local.transactions.findIndex(t => t.id === tx.id);
-  if (idx >= 0) {
-    local.transactions[idx] = { ...tx };
-  } else {
-    local.transactions.unshift({ ...tx });
-  }
-  saveLocalData(local);
 
-  if (useNeon && db) {
-    try {
-      await db
-        .insert(schema.transactions)
-        .values({
-          id: tx.id,
-          no: tx.no || null,
-          date: tx.date,
-          description: tx.description,
-          accountId: tx.accountId || null,
-          type: tx.type,
-          category: tx.category,
-          amount: Number(tx.amount) || 0,
-          notes: tx.notes || null,
-          transferTargetAccountId: tx.transferTargetAccountId || null,
-          linkedTransactionId: tx.linkedTransactionId || null,
-        })
-        .onConflictDoUpdate({
-          target: schema.transactions.id,
-          set: {
-            no: tx.no || null,
-            date: tx.date,
-            description: tx.description,
-            accountId: tx.accountId || null,
-            type: tx.type,
-            category: tx.category,
-            amount: Number(tx.amount) || 0,
-            notes: tx.notes || null,
-            transferTargetAccountId: tx.transferTargetAccountId || null,
-            linkedTransactionId: tx.linkedTransactionId || null,
-          },
-        });
-    } catch (err) {
-      console.warn('Gagal simpan transaksi ke Neon:', err);
-    }
-  }
+  if (idx >= 0) local.transactions[idx] = { ...tx };
+  else local.transactions.unshift({ ...tx });
+
+  saveLocalData(local);
 }
 
 export async function saveTransactions(txs: Transaction[]): Promise<void> {
-  if (txs.length === 0) return;
   await ensureDatabaseTables();
+  if (txs.length === 0) return;
+
+  if (useNeon && db) {
+    for (const tx of txs) {
+      await db
+        .insert(schema.transactions)
+        .values(transactionValues(tx))
+        .onConflictDoUpdate({
+          target: schema.transactions.id,
+          set: transactionValues(tx),
+        });
+    }
+    return;
+  }
 
   const local = loadLocalData();
   const txMap = new Map(local.transactions.map(t => [t.id, t]));
-  for (const t of txs) {
-    txMap.set(t.id, { ...t });
-  }
+
+  for (const tx of txs) txMap.set(tx.id, { ...tx });
+
   local.transactions = Array.from(txMap.values());
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      for (const t of txs) {
-        await db
-          .insert(schema.transactions)
-          .values({
-            id: t.id,
-            no: t.no || null,
-            date: t.date,
-            description: t.description,
-            accountId: t.accountId || null,
-            type: t.type,
-            category: t.category,
-            amount: Number(t.amount) || 0,
-            notes: t.notes || null,
-            transferTargetAccountId: t.transferTargetAccountId || null,
-            linkedTransactionId: t.linkedTransactionId || null,
-          })
-          .onConflictDoUpdate({
-            target: schema.transactions.id,
-            set: {
-              no: t.no || null,
-              date: t.date,
-              description: t.description,
-              accountId: t.accountId || null,
-              type: t.type,
-              category: t.category,
-              amount: Number(t.amount) || 0,
-              notes: t.notes || null,
-              transferTargetAccountId: t.transferTargetAccountId || null,
-              linkedTransactionId: t.linkedTransactionId || null,
-            },
-          });
-      }
-    } catch (err) {
-      console.warn('Gagal batch simpan transaksi ke Neon:', err);
-    }
-  }
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    const rows = await db
+      .select()
+      .from(schema.transactions)
+      .where(eq(schema.transactions.id, id))
+      .limit(1);
+
+    const linkedId = rows[0]?.linkedTransactionId;
+
+    await db.delete(schema.transactions).where(eq(schema.transactions.id, id));
+
+    if (linkedId) {
+      await db
+        .delete(schema.transactions)
+        .where(eq(schema.transactions.id, linkedId));
+    }
+    return;
+  }
+
   const local = loadLocalData();
   const target = local.transactions.find(t => t.id === id);
   const linkedId = target?.linkedTransactionId;
 
-  local.transactions = local.transactions.filter(t => t.id !== id && (!linkedId || t.id !== linkedId));
+  local.transactions = local.transactions.filter(
+    t => t.id !== id && (!linkedId || t.id !== linkedId),
+  );
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.transactions).where(eq(schema.transactions.id, id));
-      if (linkedId) {
-        await db.delete(schema.transactions).where(eq(schema.transactions.id, linkedId));
-      }
-    } catch (err) {
-      console.warn('Gagal hapus transaksi di Neon:', err);
-    }
-  }
 }
 
 export async function clearAllTransactions(): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    await db.delete(schema.transactions);
+    return;
+  }
+
   const local = loadLocalData();
   local.transactions = [];
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.transactions);
-    } catch (err) {
-      console.warn('Gagal hapus semua transaksi di Neon:', err);
-    }
-  }
 }
 
 // ============================================
@@ -446,25 +410,27 @@ export async function getCategories(): Promise<string[]> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    try {
-      const rows = await db
-        .select()
-        .from(schema.categories)
-        .orderBy(asc(schema.categories.createdAt), asc(schema.categories.name));
-      if (rows.length > 0) return rows.map(c => c.name);
-    } catch (err) {
-      console.warn('Fallback getCategories ke local:', err);
-    }
+    const rows = await db
+      .select()
+      .from(schema.categories)
+      .orderBy(asc(schema.categories.createdAt), asc(schema.categories.name));
+
+    return rows.map(c => c.name);
   }
 
-  const local = loadLocalData();
-  return local.categories.map(c => c.name);
+  return loadLocalData().categories.map(c => c.name);
 }
 
 export async function addCategory(name: string): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    await db.insert(schema.categories).values({ name }).onConflictDoNothing();
+    return;
+  }
+
   const local = loadLocalData();
+
   if (!local.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
     local.categories.push({
       name,
@@ -473,18 +439,19 @@ export async function addCategory(name: string): Promise<void> {
     });
     saveLocalData(local);
   }
-
-  if (useNeon && db) {
-    try {
-      await db.insert(schema.categories).values({ name }).onConflictDoNothing();
-    } catch (err) {
-      console.warn('Gagal tambah kategori di Neon:', err);
-    }
-  }
 }
 
 export async function deleteCategory(name: string): Promise<void> {
   await ensureDatabaseTables();
+
+  if (useNeon && db) {
+    await db.delete(schema.categories).where(eq(schema.categories.name, name));
+    await db
+      .update(schema.transactions)
+      .set({ category: '' })
+      .where(eq(schema.transactions.category, name));
+    return;
+  }
 
   const local = loadLocalData();
   local.categories = local.categories.filter(c => c.name !== name);
@@ -492,15 +459,6 @@ export async function deleteCategory(name: string): Promise<void> {
     if (t.category === name) t.category = '';
   });
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.categories).where(eq(schema.categories.name, name));
-      await db.update(schema.transactions).set({ category: '' }).where(eq(schema.transactions.category, name));
-    } catch (err) {
-      console.warn('Gagal hapus kategori di Neon:', err);
-    }
-  }
 }
 
 // ============================================
@@ -511,39 +469,35 @@ export async function getDebts(): Promise<Debt[]> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    try {
-      const [debtRows, payRows] = await Promise.all([
-        db.select().from(schema.debts).orderBy(desc(schema.debts.createdAt)),
-        db.select().from(schema.debtPayments).orderBy(desc(schema.debtPayments.date)),
-      ]);
+    const [debtRows, payRows] = await Promise.all([
+      db.select().from(schema.debts).orderBy(desc(schema.debts.createdAt)),
+      db.select().from(schema.debtPayments).orderBy(desc(schema.debtPayments.date)),
+    ]);
 
-      return debtRows.map(d => ({
-        id: d.id,
-        type: d.type as 'utang' | 'piutang',
-        name: d.name,
-        counterparty: d.counterparty || '',
-        totalAmount: Number(d.totalAmount) || 0,
-        startDate: d.startDate,
-        dueDate: d.dueDate || undefined,
-        installmentAmount: d.installmentAmount ? Number(d.installmentAmount) : undefined,
-        installmentPeriod: d.installmentPeriod || undefined,
-        notes: d.notes || undefined,
-        createdAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString(),
-        archivedAt: d.archivedAt ? d.archivedAt.toISOString() : undefined,
-        payments: payRows
-          .filter(p => p.debtId === d.id)
-          .map(p => ({
-            id: p.id,
-            debtId: p.debtId,
-            date: p.date,
-            amount: Number(p.amount) || 0,
-            accountId: p.accountId || undefined,
-            notes: p.notes || undefined,
-          })),
-      }));
-    } catch (err) {
-      console.warn('Fallback getDebts ke local:', err);
-    }
+    return debtRows.map(d => ({
+      id: d.id,
+      type: d.type as 'utang' | 'piutang',
+      name: d.name,
+      counterparty: d.counterparty || '',
+      totalAmount: Number(d.totalAmount) || 0,
+      startDate: d.startDate,
+      dueDate: d.dueDate || undefined,
+      installmentAmount: d.installmentAmount ? Number(d.installmentAmount) : undefined,
+      installmentPeriod: d.installmentPeriod || undefined,
+      notes: d.notes || undefined,
+      createdAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString(),
+      archivedAt: d.archivedAt ? d.archivedAt.toISOString() : undefined,
+      payments: payRows
+        .filter(p => p.debtId === d.id)
+        .map(p => ({
+          id: p.id,
+          debtId: p.debtId,
+          date: p.date,
+          amount: Number(p.amount) || 0,
+          accountId: p.accountId || undefined,
+          notes: p.notes || undefined,
+        })),
+    }));
   }
 
   const local = loadLocalData();
@@ -556,21 +510,25 @@ export async function getDebts(): Promise<Debt[]> {
 export async function saveDebt(d: Debt): Promise<void> {
   await ensureDatabaseTables();
 
-  const local = loadLocalData();
-  const idx = local.debts.findIndex(debt => debt.id === d.id);
-  if (idx >= 0) {
-    local.debts[idx] = { ...d, payments: d.payments || local.debts[idx].payments || [] };
-  } else {
-    local.debts.unshift({ ...d, payments: d.payments || [] });
-  }
-  saveLocalData(local);
-
   if (useNeon && db) {
-    try {
-      await db
-        .insert(schema.debts)
-        .values({
-          id: d.id,
+    await db
+      .insert(schema.debts)
+      .values({
+        id: d.id,
+        type: d.type,
+        name: d.name,
+        counterparty: d.counterparty || null,
+        totalAmount: Number(d.totalAmount) || 0,
+        startDate: d.startDate,
+        dueDate: d.dueDate || null,
+        installmentAmount: d.installmentAmount ? Number(d.installmentAmount) : null,
+        installmentPeriod: d.installmentPeriod || null,
+        notes: d.notes || null,
+        createdAt: d.createdAt ? new Date(d.createdAt) : new Date(),
+      })
+      .onConflictDoUpdate({
+        target: schema.debts.id,
+        set: {
           type: d.type,
           name: d.name,
           counterparty: d.counterparty || null,
@@ -580,58 +538,73 @@ export async function saveDebt(d: Debt): Promise<void> {
           installmentAmount: d.installmentAmount ? Number(d.installmentAmount) : null,
           installmentPeriod: d.installmentPeriod || null,
           notes: d.notes || null,
-          createdAt: d.createdAt ? new Date(d.createdAt) : new Date(),
-        })
-        .onConflictDoUpdate({
-          target: schema.debts.id,
-          set: {
-            type: d.type,
-            name: d.name,
-            counterparty: d.counterparty || null,
-            totalAmount: Number(d.totalAmount) || 0,
-            startDate: d.startDate,
-            dueDate: d.dueDate || null,
-            installmentAmount: d.installmentAmount ? Number(d.installmentAmount) : null,
-            installmentPeriod: d.installmentPeriod || null,
-            notes: d.notes || null,
-          },
-        });
-    } catch (err) {
-      console.warn('Gagal simpan debt ke Neon:', err);
-    }
+        },
+      });
+    return;
   }
+
+  const local = loadLocalData();
+  const idx = local.debts.findIndex(debt => debt.id === d.id);
+
+  if (idx >= 0) {
+    local.debts[idx] = {
+      ...d,
+      payments: d.payments || local.debts[idx].payments || [],
+    };
+  } else {
+    local.debts.unshift({ ...d, payments: d.payments || [] });
+  }
+
+  saveLocalData(local);
 }
 
 export async function deleteDebt(id: string): Promise<void> {
   await ensureDatabaseTables();
 
+  if (useNeon && db) {
+    await db.delete(schema.debts).where(eq(schema.debts.id, id));
+    return;
+  }
+
   const local = loadLocalData();
   local.debts = local.debts.filter(d => d.id !== id);
   local.debtPayments = (local.debtPayments || []).filter(p => p.debtId !== id);
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.debts).where(eq(schema.debts.id, id));
-    } catch (err) {
-      console.warn('Gagal hapus debt di Neon:', err);
-    }
-  }
 }
 
 export async function saveDebtPayment(p: DebtPayment): Promise<void> {
   await ensureDatabaseTables();
 
-  const local = loadLocalData();
-  if (!local.debtPayments) local.debtPayments = [];
-  const idx = local.debtPayments.findIndex(pay => pay.id === p.id);
-  if (idx >= 0) {
-    local.debtPayments[idx] = { ...p };
-  } else {
-    local.debtPayments.push({ ...p });
+  if (useNeon && db) {
+    await db
+      .insert(schema.debtPayments)
+      .values({
+        id: p.id,
+        debtId: p.debtId,
+        date: p.date,
+        amount: Number(p.amount) || 0,
+        accountId: p.accountId || null,
+        notes: p.notes || null,
+      })
+      .onConflictDoUpdate({
+        target: schema.debtPayments.id,
+        set: {
+          date: p.date,
+          amount: Number(p.amount) || 0,
+          accountId: p.accountId || null,
+          notes: p.notes || null,
+        },
+      });
+    return;
   }
 
-  // Sync juga ke debts array
+  const local = loadLocalData();
+  if (!local.debtPayments) local.debtPayments = [];
+
+  const idx = local.debtPayments.findIndex(pay => pay.id === p.id);
+  if (idx >= 0) local.debtPayments[idx] = { ...p };
+  else local.debtPayments.push({ ...p });
+
   const debt = local.debts.find(d => d.id === p.debtId);
   if (debt) {
     if (!debt.payments) debt.payments = [];
@@ -641,36 +614,15 @@ export async function saveDebtPayment(p: DebtPayment): Promise<void> {
   }
 
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db
-        .insert(schema.debtPayments)
-        .values({
-          id: p.id,
-          debtId: p.debtId,
-          date: p.date,
-          amount: Number(p.amount) || 0,
-          accountId: p.accountId || null,
-          notes: p.notes || null,
-        })
-        .onConflictDoUpdate({
-          target: schema.debtPayments.id,
-          set: {
-            date: p.date,
-            amount: Number(p.amount) || 0,
-            accountId: p.accountId || null,
-            notes: p.notes || null,
-          },
-        });
-    } catch (err) {
-      console.warn('Gagal simpan payment ke Neon:', err);
-    }
-  }
 }
 
 export async function deleteDebtPayment(id: string): Promise<void> {
   await ensureDatabaseTables();
+
+  if (useNeon && db) {
+    await db.delete(schema.debtPayments).where(eq(schema.debtPayments.id, id));
+    return;
+  }
 
   const local = loadLocalData();
   local.debtPayments = (local.debtPayments || []).filter(p => p.id !== id);
@@ -678,185 +630,204 @@ export async function deleteDebtPayment(id: string): Promise<void> {
     if (d.payments) d.payments = d.payments.filter(p => p.id !== id);
   });
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.debtPayments).where(eq(schema.debtPayments.id, id));
-    } catch (err) {
-      console.warn('Gagal hapus payment di Neon:', err);
-    }
-  }
 }
 
 // ============================================
 // YEARLY ARCHIVES & TUTUP BUKU
 // ============================================
 
-export async function getYearlyArchives(year?: number): Promise<YearlyArchive[] | YearlyArchive | null> {
+export async function getYearlyArchives(
+  year?: number,
+): Promise<YearlyArchive[] | YearlyArchive | null> {
   await ensureDatabaseTables();
 
   if (useNeon && db) {
-    try {
-      if (year) {
-        const rows = await db
-          .select()
-          .from(schema.yearlyArchives)
-          .where(eq(schema.yearlyArchives.year, year))
-          .limit(1);
-        if (rows.length === 0) return null;
-        return {
-          id: rows[0].id,
-          year: rows[0].year,
-          transactionCount: rows[0].transactionCount,
-          data: rows[0].data as any,
-          createdAt: rows[0].createdAt ? rows[0].createdAt.toISOString() : new Date().toISOString(),
-        };
-      }
+    if (year) {
+      const rows = await db
+        .select()
+        .from(schema.yearlyArchives)
+        .where(eq(schema.yearlyArchives.year, year))
+        .limit(1);
 
-      const rows = await db.select().from(schema.yearlyArchives).orderBy(desc(schema.yearlyArchives.year));
-      return rows.map(r => ({
-        id: r.id,
-        year: r.year,
-        transactionCount: r.transactionCount,
-        data: r.data as any,
-        createdAt: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
-      }));
-    } catch (err) {
-      console.warn('Fallback getYearlyArchives ke local:', err);
+      if (rows.length === 0) return null;
+
+      return {
+        id: rows[0].id,
+        year: rows[0].year,
+        transactionCount: rows[0].transactionCount,
+        data: rows[0].data as any,
+        createdAt: rows[0].createdAt
+          ? rows[0].createdAt.toISOString()
+          : new Date().toISOString(),
+      };
     }
+
+    const rows = await db
+      .select()
+      .from(schema.yearlyArchives)
+      .orderBy(desc(schema.yearlyArchives.year));
+
+    return rows.map(r => ({
+      id: r.id,
+      year: r.year,
+      transactionCount: r.transactionCount,
+      data: r.data as any,
+      createdAt: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
+    }));
   }
 
   const local = loadLocalData();
+
   if (year) {
     return local.yearlyArchives.find(a => a.year === year) || null;
   }
+
   return [...local.yearlyArchives].sort((a, b) => b.year - a.year);
 }
 
 export async function saveYearlyArchive(archive: YearlyArchive): Promise<void> {
   await ensureDatabaseTables();
 
-  const local = loadLocalData();
-  const idx = local.yearlyArchives.findIndex(a => a.year === archive.year);
-  if (idx >= 0) {
-    local.yearlyArchives[idx] = { ...archive };
-  } else {
-    local.yearlyArchives.push({ ...archive });
-  }
-  saveLocalData(local);
-
   if (useNeon && db) {
-    try {
-      await db
-        .insert(schema.yearlyArchives)
-        .values({
-          id: archive.id,
-          year: archive.year,
+    await db
+      .insert(schema.yearlyArchives)
+      .values({
+        id: archive.id,
+        year: archive.year,
+        transactionCount: archive.transactionCount,
+        data: archive.data,
+        createdAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: schema.yearlyArchives.year,
+        set: {
           transactionCount: archive.transactionCount,
           data: archive.data,
           createdAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: schema.yearlyArchives.year,
-          set: {
-            transactionCount: archive.transactionCount,
-            data: archive.data,
-            createdAt: new Date(),
-          },
-        });
-    } catch (err) {
-      console.warn('Gagal simpan arsip ke Neon:', err);
-    }
+        },
+      });
+    return;
   }
+
+  const local = loadLocalData();
+  const idx = local.yearlyArchives.findIndex(a => a.year === archive.year);
+
+  if (idx >= 0) local.yearlyArchives[idx] = { ...archive };
+  else local.yearlyArchives.push({ ...archive });
+
+  saveLocalData(local);
 }
 
 export async function executeCloseBook(
   targetYear: number,
   archivePayload: YearlyArchive,
   accountBalances: { accountId: string; balance: number }[],
-  pocketBalances: { category: string; balance: number }[]
+  pocketBalances: { category: string; balance: number }[],
 ): Promise<void> {
   await ensureDatabaseTables();
 
-  // 1. Simpan arsip
+  // Simpan arsip sebelum mengubah data.
   await saveYearlyArchive(archivePayload);
 
-  // 2. Update saldo awal akun
-  for (const ab of accountBalances) {
-    const accs = await getAccounts();
-    const targetAcc = accs.find(a => a.id === ab.accountId);
-    if (targetAcc) {
-      targetAcc.initialBalance = ab.balance;
-      await saveAccount(targetAcc);
+  // Perbarui saldo awal rekening.
+  const accounts = await getAccounts();
+
+  for (const balance of accountBalances) {
+    const account = accounts.find(a => a.id === balance.accountId);
+
+    if (account) {
+      await saveAccount({
+        ...account,
+        initialBalance: Number(balance.balance) || 0,
+      });
     }
   }
 
-  // 3. Update saldo awal kategori
-  const local = loadLocalData();
-  for (const pb of pocketBalances) {
-    const cat = local.categories.find(c => c.name === pb.category);
-    if (cat) cat.openingBalance = pb.balance;
-  }
-
-  // 4. Hapus transaksi tahun tersebut
-  const yearStr = String(targetYear);
-  local.transactions = local.transactions.filter(t => !t.date || !t.date.startsWith(yearStr));
-
-  // 5. Arsipkan utang yang sudah lunas
+  // Tandai utang/piutang yang sudah lunas sebagai arsip.
   const debts = await getDebts();
-  debts.forEach(d => {
-    const total = Number(d.totalAmount) || 0;
-    const paid = (d.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    if (paid >= total && !d.archivedAt) {
-      d.archivedAt = new Date().toISOString();
-      const localDebt = local.debts.find(ld => ld.id === d.id);
-      if (localDebt) localDebt.archivedAt = d.archivedAt;
-    }
-  });
+  const now = new Date();
 
-  saveLocalData(local);
+  for (const debt of debts) {
+    const total = Number(debt.totalAmount) || 0;
+    const paid = (debt.payments || []).reduce(
+      (sum, payment) => sum + (Number(payment.amount) || 0),
+      0,
+    );
 
-  if (useNeon && db && sql) {
-    try {
-      // Hapus transaksi di Neon
-      await sql`DELETE FROM transactions WHERE EXTRACT(YEAR FROM date) = ${targetYear}`;
+    if (paid >= total && !debt.archivedAt) {
+      if (useNeon && db) {
+        await db
+          .update(schema.debts)
+          .set({ archivedAt: now })
+          .where(eq(schema.debts.id, debt.id));
+      } else {
+        const local = loadLocalData();
+        const localDebt = local.debts.find(d => d.id === debt.id);
 
-      // Arsipkan utang lunas di Neon
-      for (const d of debts) {
-        if (d.archivedAt) {
-          await db
-            .update(schema.debts)
-            .set({ archivedAt: new Date(d.archivedAt) })
-            .where(eq(schema.debts.id, d.id));
+        if (localDebt) {
+          localDebt.archivedAt = now.toISOString();
+          saveLocalData(local);
         }
       }
-    } catch (err) {
-      console.warn('Gagal executeCloseBook di Neon:', err);
     }
   }
+
+  // Perbarui saldo awal kategori/kantong.
+  if (useNeon && db) {
+    for (const balance of pocketBalances) {
+      await db
+        .update(schema.categories)
+        .set({ openingBalance: Number(balance.balance) || 0 })
+        .where(eq(schema.categories.name, balance.category));
+    }
+
+    // Hapus transaksi yang tanggalnya termasuk tahun tutup buku.
+    await sql`
+      DELETE FROM transactions
+      WHERE EXTRACT(YEAR FROM date) = ${targetYear}
+    `;
+
+    return;
+  }
+
+  const local = loadLocalData();
+
+  for (const balance of pocketBalances) {
+    const category = local.categories.find(
+      c => c.name === balance.category,
+    );
+
+    if (category) {
+      category.openingBalance = Number(balance.balance) || 0;
+    }
+  }
+
+  const yearPrefix = `${targetYear}-`;
+  local.transactions = local.transactions.filter(
+    transaction => !transaction.date?.startsWith(yearPrefix),
+  );
+
+  saveLocalData(local);
 }
 
 export async function restoreCloseBook(
   targetYear: number,
-  txs: Transaction[]
+  txs: Transaction[],
 ): Promise<number> {
   await ensureDatabaseTables();
 
-  // Kembalikan transaksi
   await saveTransactions(txs);
 
-  // Hapus arsip
+  if (useNeon && db) {
+    await db
+      .delete(schema.yearlyArchives)
+      .where(eq(schema.yearlyArchives.year, targetYear));
+    return txs.length;
+  }
+
   const local = loadLocalData();
   local.yearlyArchives = local.yearlyArchives.filter(a => a.year !== targetYear);
   saveLocalData(local);
-
-  if (useNeon && db) {
-    try {
-      await db.delete(schema.yearlyArchives).where(eq(schema.yearlyArchives.year, targetYear));
-    } catch (err) {
-      console.warn('Gagal hapus arsip di Neon:', err);
-    }
-  }
 
   return txs.length;
 }
