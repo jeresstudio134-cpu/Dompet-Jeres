@@ -132,7 +132,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
       await apiLogin(pin.trim());
       setPinInput('');
       onLoginSuccess();
-      setActiveView('menu');
+      onClose();
     } catch (err: any) {
       setErrorMessage(err.message || 'Gagal memeriksa PIN. Periksa koneksi lalu coba lagi.');
       setPinInput(''); // kosongkan supaya bisa mengetik ulang
