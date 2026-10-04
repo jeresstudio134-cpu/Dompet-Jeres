@@ -20,6 +20,10 @@ export function createApp() {
   });
   app.use('/api', adminContext);
 
+  app.get('/api/warmup', (_req, res) => {
+    res.json({ status: 'warm', timestamp: new Date().toISOString() });
+  });
+
   app.use('/api/transactions', transactionsRouter);
   app.use('/api', (_req, res) => {
     res.status(404).json({ success: false, error: 'Endpoint tidak ditemukan.' });
