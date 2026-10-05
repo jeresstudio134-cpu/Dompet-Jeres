@@ -78,7 +78,8 @@ function toDateStr(val: any): string | undefined {
 }
 
 export default async function handler(req: any, res: any) {
-  const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+  let databaseUrl = (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').trim();
+  databaseUrl = databaseUrl.replace(/^(DATABASE_URL|NEON_DATABASE_URL)\s*=\s*/i, '').replace(/^psql\s+/i, '').replace(/^['"]+|['"]+$/g, '').trim();
   if (!databaseUrl) {
     return res.status(500).json({
       success: false,

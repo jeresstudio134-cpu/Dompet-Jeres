@@ -415,6 +415,16 @@ export default function App() {
   // Muat semua data dari database
     const CACHE_KEY = 'dompet_cache_v1';
 
+  const resolveTxKantong = (t: Transaction): string => {
+    const kt = t.kantong?.trim();
+    if (kt && kt !== '-') return kt;
+    const cat = t.category?.trim();
+    if (cat && cat !== '-' && cat !== 'Pindah Saldo' && cat !== 'Pindah Kantong' && !isExcludedCategory(cat)) {
+      return cat;
+    }
+    return '';
+  };
+
   // Muat semua data: tampilkan data tersimpan dulu, lalu segarkan dari database
   const loadAll = async () => {
     let hasCache = false;
@@ -423,15 +433,23 @@ export default function App() {
       if (raw) {
         const c = JSON.parse(raw);
         if (Array.isArray(c.accounts) && Array.isArray(c.transactions)) {
-  setAccounts(c.accounts);
-  setTransactions(c.transactions);
-  setCategories(Array.isArray(c.categories) ? c.categories : []);
-  if (Array.isArray(c.kantongList)) setKantongList(c.kantongList); // <--- Tambahkan ini
-  if (c.storeName) setStoreName(c.storeName);
-  if (c.ownerName) setOwnerName(c.ownerName);
-  hasCache = true;
-  setIsLoading(false);
-}
+          const cachedTx = (c.transactions as Transaction[]).map(t => {
+            const kt = resolveTxKantong(t);
+            return kt && !t.kantong ? { ...t, kantong: kt } : t;
+          });
+          setAccounts(c.accounts);
+          setTransactions(cachedTx);
+          setCategories(Array.isArray(c.categories) ? c.categories : []);
+          if (Array.isArray(c.kantongList) && c.kantongList.length > 0) {
+            setKantongList(c.kantongList);
+          } else if (Array.isArray(c.categories) && c.categories.length > 0) {
+            setKantongList(c.categories.filter((k: string) => !isExcludedCategory(k) && k !== 'Pindah Saldo'));
+          }
+          if (c.storeName) setStoreName(c.storeName);
+          if (c.ownerName) setOwnerName(c.ownerName);
+          hasCache = true;
+          setIsLoading(false);
+        }
       }
     } catch {
       /* cache rusak, abaikan */
@@ -449,20 +467,37 @@ export default function App() {
         await Promise.all(accs.map(a => apiSaveAccount(a))).catch(() => {});
       }
 
+      const normalizedTx = data.transactions.map(t => {
+        const kt = resolveTxKantong(t);
+        return kt && !t.kantong ? { ...t, kantong: kt } : t;
+      });
+
       let cats = data.categories.filter(c => !isExcludedCategory(c));
       if (cats.length === 0) {
         cats = INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c));
         await Promise.all(cats.map(c => apiAddCategory(c))).catch(() => {});
       }
 
-     // Ganti data.kantongList menjadi data.kantongs
-let kts = (data.kantongs || []).filter(k => !isExcludedCategory(k));
-if (kts.length === 0) {
-  kts = INITIAL_KANTONG ? INITIAL_KANTONG.filter(k => !isExcludedCategory(k)) : [];
-}
+      let kts = (data.kantongs || data.kantongList || []).filter(k => !isExcludedCategory(k));
+      if (kts.length === 0) {
+        const legacyKantong = new Set<string>();
+        data.categories.forEach(c => {
+          if (!isExcludedCategory(c) && c !== 'Pindah Saldo' && c !== 'Pindah Kantong') legacyKantong.add(c.trim());
+        });
+        normalizedTx.forEach(t => {
+          const kt = resolveTxKantong(t);
+          if (kt) legacyKantong.add(kt);
+        });
+        kts =
+          legacyKantong.size > 0
+            ? Array.from(legacyKantong)
+            : INITIAL_KANTONG
+            ? INITIAL_KANTONG.filter(k => !isExcludedCategory(k))
+            : [];
+      }
 
       setAccounts(accs);
-      setTransactions(data.transactions);
+      setTransactions(normalizedTx);
       setCategories(cats);
       setKantongList(kts);
       if (data.storeName && data.storeName.trim()) setStoreName(data.storeName.trim());
@@ -474,36 +509,39 @@ if (kts.length === 0) {
         .then(setDebts)
         .catch(err => console.warn('Gagal memuat utang-piutang:', err));
     } catch (e: any) {
-  console.warn('Gagal memuat data dari database/server, fallback ke penyimpanan lokal:', e);
-  setAccounts(INITIAL_ACCOUNTS);
-  setTransactions(INITIAL_TRANSACTIONS);
-  setCategories(INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c)));
-  // Tambahkan ini agar kantong tetap muncul saat offline:
-  setKantongList(INITIAL_KANTONG ? INITIAL_KANTONG.filter(k => !isExcludedCategory(k)) : []);
-  setLoadError(null);
-}
+      console.warn('Gagal memuat data dari database/server, fallback ke penyimpanan lokal:', e);
+      setAccounts(INITIAL_ACCOUNTS);
+      setTransactions(INITIAL_TRANSACTIONS);
+      setCategories(INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c)));
+      setKantongList(INITIAL_KANTONG ? INITIAL_KANTONG.filter(k => !isExcludedCategory(k)) : []);
+      setLoadError(null);
+    } finally {
+      clearTimeout(slowTimer);
+      setLoadSlow(false);
+      setIsLoading(false);
+    }
   };
 
   // Simpan salinan terbaru agar pembukaan berikutnya langsung tampil
   useEffect(() => {
-  if (isLoading || accounts.length === 0) return;
-  try {
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ 
-        accounts, 
-        transactions, 
-        categories, 
-        kantongList, // <--- Tambahkan ini
-        storeName, 
-        ownerName 
-      })
-    );
-  } catch {
-    /* penyimpanan penuh, abaikan */
-  }
-}, [accounts, transactions, categories, kantongList, storeName, ownerName, isLoading]); // <--- Tambahkan kantongList di dependency array
-  
+    if (isLoading || accounts.length === 0) return;
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({
+          accounts,
+          transactions,
+          categories,
+          kantongList,
+          storeName,
+          ownerName,
+        })
+      );
+    } catch {
+      /* penyimpanan penuh, abaikan */
+    }
+  }, [accounts, transactions, categories, kantongList, storeName, ownerName, isLoading]);
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -521,12 +559,12 @@ if (kts.length === 0) {
     const dailyExpenses: Record<string, number> = {};
 
     transactions.forEach(t => {
-      if (t.category === 'Pindah Saldo' || t.id.startsWith('kt-')) return;
+      if (t.category === 'Pindah Saldo' || t.category === 'Pindah Kantong' || t.id.startsWith('kt-')) return;
       if (t.type === 'masuk') {
         totalMasuk += t.amount;
       } else {
         totalKeluar += t.amount;
-        const cat = t.category || 'Lainnya';
+        const cat = t.category || t.kantong || 'Lainnya';
         categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + t.amount;
         dailyExpenses[t.date] = (dailyExpenses[t.date] || 0) + t.amount;
       }
@@ -572,9 +610,10 @@ if (kts.length === 0) {
       if (filter.accountId !== 'ALL' && t.accountId !== filter.accountId) return false;
       if (filter.type !== 'ALL' && t.type !== filter.type) return false;
       if (filter.kantong && filter.kantong !== 'ALL') {
+        const tKt = resolveTxKantong(t);
         if (filter.kantong === 'EMPTY') {
-          if (t.kantong && t.kantong.trim() !== '' && t.kantong !== '-') return false;
-        } else if (t.kantong !== filter.kantong) {
+          if (tKt) return false;
+        } else if (tKt !== filter.kantong) {
           return false;
         }
       }
@@ -1033,6 +1072,10 @@ if (kts.length === 0) {
         onAddTransactions={handleAddTransactions}
         accounts={accounts}
         categories={categories}
+        kantongList={kantongList}
+        transactions={transactions}
+        onAddCategory={handleAddCategory}
+        onAddKantong={handleAddKantong}
       />
 
       <NeonVercelModal

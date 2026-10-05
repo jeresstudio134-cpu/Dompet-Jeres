@@ -4,11 +4,20 @@ import * as schema from './schema.js';
 
 export { schema };
 
+export function getCleanDatabaseUrl(): string {
+  let raw = (process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '').trim();
+  if (!raw) return '';
+  raw = raw.replace(/^(DATABASE_URL|NEON_DATABASE_URL)\s*=\s*/i, '').trim();
+  raw = raw.replace(/^psql\s+/i, '').trim();
+  raw = raw.replace(/^['"]+|['"]+$/g, '').trim();
+  return raw;
+}
+
 function createDb(url: string) {
   return drizzle(neon(url), { schema });
 }
 
-const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '';
+const dbUrl = getCleanDatabaseUrl();
 export const isNeonConfigured = Boolean(dbUrl);
 
 let sql: ReturnType<typeof neon<false, false>>;
@@ -60,17 +69,21 @@ try {
 export { db, sql };
 
 let instance: ReturnType<typeof createDb> | null = null;
+let lastUrl = '';
 
 export function hasDatabaseUrl(): boolean {
-  return Boolean(process.env.DATABASE_URL || process.env.NEON_DATABASE_URL);
+  return Boolean(getCleanDatabaseUrl());
 }
 
 // Koneksi dibuat saat pertama dipakai, supaya error "DATABASE_URL kosong" muncul sebagai pesan API yang jelas
 export function getDb() {
-  const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+  const url = getCleanDatabaseUrl();
   if (!url) {
     throw new Error('DATABASE_URL belum diisi. Tambahkan di Environment Variables (Vercel) atau file .env.');
   }
-  if (!instance) instance = createDb(url);
+  if (!instance || lastUrl !== url) {
+    instance = createDb(url);
+    lastUrl = url;
+  }
   return instance;
 }

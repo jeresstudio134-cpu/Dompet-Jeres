@@ -23,23 +23,25 @@ async function checkBackend(): Promise<boolean> {
   try {
     const res = await fetch(API_URL, {
       method: 'GET',
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(15000),
     });
     const ct = res.headers.get('content-type') || '';
     if (!res.ok || !ct.includes('application/json')) {
-      backendAvailable = false;
       return false;
     }
     const json = await res.json().catch(() => null);
-    if (!json || json.success === false || json.databaseConnected === false) {
+    if (!json || json.databaseConnected === false) {
       backendAvailable = false;
       return false;
     }
+    if (json.success === false) {
+      return false;
+    }
     backendAvailable = true;
+    return true;
   } catch {
-    backendAvailable = false;
+    return false;
   }
-  return backendAvailable;
 }
 
 // ============================================
@@ -246,6 +248,22 @@ async function safeRequest(url: string, options: RequestInit = {}): Promise<any 
 // LOAD SEMUA DATA
 // ============================================
 
+function normalizeLegacyTx(t: Transaction): Transaction {
+  const kt = t.kantong?.trim();
+  if (kt && kt !== '-') return t;
+  const cat = t.category?.trim();
+  if (
+    cat &&
+    cat !== '-' &&
+    cat !== 'Pindah Saldo' &&
+    cat !== 'Pindah Kantong' &&
+    !['lainnya', 'lainya', 'lain-lain', 'lain nya'].includes(cat.toLowerCase())
+  ) {
+    return { ...t, kantong: cat };
+  }
+  return t;
+}
+
 export const apiLoadAll = async (): Promise<{
   accounts: Account[];
   transactions: Transaction[];
@@ -255,37 +273,58 @@ export const apiLoadAll = async (): Promise<{
   storeName: string | null;
   ownerName: string | null;
 }> => {
-  const hasBackend = await checkBackend();
-
-  if (hasBackend) {
+  if (backendAvailable !== false) {
     try {
-      const json = await safeRequest(API_URL);
-      if (json && json.success) {
-        const serverAccounts = (json.accounts || []) as Account[];
-        const serverTransactions = (json.transactions || []) as Transaction[];
-        const serverCategories = (json.categories || []) as string[];
-        const serverKantongs = (json.kantongs || []) as string[];
-        const serverStoreName = (json.storeName ?? null) as string | null;
-        const serverOwnerName = (json.ownerName ?? null) as string | null;
+      const res = await fetch(API_URL, {
+        method: 'GET',
+        signal: AbortSignal.timeout(20000),
+      });
+      const ct = res.headers.get('content-type') || '';
+      if (res.ok && ct.includes('application/json')) {
+        const json = await res.json().catch(() => null);
+        if (json?.databaseConnected === false || (json?.error && String(json.error).includes('DATABASE_URL'))) {
+          backendAvailable = false;
+        } else if (json && json.success) {
+          backendAvailable = true;
+          const serverAccounts = (json.accounts || []) as Account[];
+          const serverTransactions = ((json.transactions || []) as Transaction[]).map(normalizeLegacyTx);
+          const serverCategories = (json.categories || []) as string[];
+          const serverKantongs = (json.kantongs || []) as string[];
+          const serverStoreName = (json.storeName ?? null) as string | null;
+          const serverOwnerName = (json.ownerName ?? null) as string | null;
 
-        // Simpan cache untuk baca cepat
-        if (serverAccounts.length > 0) saveLocalAccounts(serverAccounts);
-        if (serverTransactions.length > 0) saveLocalTransactions(serverTransactions);
-        if (serverCategories.length > 0) saveLocalCategories(serverCategories);
-        if (serverKantongs.length > 0) saveLocalKantong(serverKantongs);
-        if (serverStoreName) saveLocalStoreName(serverStoreName);
-        if (serverOwnerName) saveLocalOwnerName(serverOwnerName);
+          let resolvedKantongs = serverKantongs.filter(Boolean);
+          if (resolvedKantongs.length === 0) {
+            const fromLegacy = new Set<string>();
+            serverCategories.forEach(c => {
+              if (c && c !== 'Pindah Saldo' && c !== 'Pindah Kantong') fromLegacy.add(c);
+            });
+            serverTransactions.forEach(t => {
+              if (t.kantong && t.kantong !== 'Pindah Saldo' && t.kantong !== 'Pindah Kantong') {
+                fromLegacy.add(t.kantong);
+              }
+            });
+            resolvedKantongs = fromLegacy.size > 0 ? Array.from(fromLegacy) : getLocalKantong();
+          }
 
-        const resolvedKantongs = serverKantongs.length > 0 ? serverKantongs : getLocalKantong();
-        return {
-          accounts: serverAccounts,
-          transactions: serverTransactions,
-          categories: serverCategories,
-          kantongList: resolvedKantongs,
-          kantongs: resolvedKantongs,
-          storeName: serverStoreName,
-          ownerName: serverOwnerName,
-        };
+          // Simpan cache untuk baca cepat
+          if (serverAccounts.length > 0) saveLocalAccounts(serverAccounts);
+          if (serverTransactions.length > 0) saveLocalTransactions(serverTransactions);
+          if (serverCategories.length > 0) saveLocalCategories(serverCategories);
+          if (resolvedKantongs.length > 0) saveLocalKantong(resolvedKantongs);
+          if (serverStoreName) saveLocalStoreName(serverStoreName);
+          if (serverOwnerName) saveLocalOwnerName(serverOwnerName);
+
+          return {
+            accounts: serverAccounts,
+            transactions: serverTransactions,
+            categories: serverCategories,
+            kantongList: resolvedKantongs,
+            kantongs: resolvedKantongs,
+            storeName: serverStoreName,
+            ownerName: serverOwnerName,
+          };
+        }
       }
     } catch (err) {
       console.warn('Backend error, fallback ke lokal:', err);
@@ -296,7 +335,7 @@ export const apiLoadAll = async (): Promise<{
   const localKantongs = getLocalKantong();
   return {
     accounts: getLocalAccounts(),
-    transactions: getLocalTransactions(),
+    transactions: getLocalTransactions().map(normalizeLegacyTx),
     categories: getLocalCategories(),
     kantongList: localKantongs,
     kantongs: localKantongs,
@@ -534,8 +573,10 @@ export interface AiParsedItem {
   description: string;
   accountId: string;
   type: 'masuk' | 'keluar';
+  kantong?: string;
   category: string;
   amount: number;
+  notes?: string;
   transferToAccountId: string;
 }
 

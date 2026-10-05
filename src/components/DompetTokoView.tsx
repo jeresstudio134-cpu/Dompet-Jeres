@@ -123,17 +123,23 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
   const handleStartEdit = (tx: Transaction) => {
     if (isCatTransfer(tx)) {
-      alert('Pindah kategori tidak bisa diedit. Hapus lalu buat ulang dengan nominal yang benar.');
+      alert('Pindah jatah kantong/kategori tidak bisa diedit. Hapus lalu buat ulang dengan nominal yang benar.');
       return;
     }
+    const resolvedKt =
+      tx.kantong && tx.kantong.trim() && tx.kantong !== '-'
+        ? tx.kantong.trim()
+        : tx.category && tx.category !== '-' && tx.category !== 'Pindah Saldo' && tx.category !== 'Pindah Kantong'
+        ? tx.category.trim()
+        : '';
     setEditingTx(tx);
     setEditDate(tx.date);
     setEditKeterangan(tx.description);
     setEditAkun(tx.accountId);
     setEditJenis(tx.type);
     setEditNominalStr(tx.amount.toLocaleString('id-ID'));
-    setEditKategori(tx.category || '');
-    setEditKantong(tx.kantong || '');
+    setEditKategori(tx.category || resolvedKt || '');
+    setEditKantong(resolvedKt);
     setEditCatatan(tx.notes || tx.catatan || '');
   };
 
@@ -146,12 +152,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       alert('Nominal harus lebih dari 0.');
       return;
     }
-    if (!editKategori.trim()) {
-      alert('Kategori wajib dipilih.');
+    if (!editKantong.trim() && !editKategori.trim()) {
+      alert('Kantong atau Kategori wajib dipilih.');
       return;
     }
 
     const trimmedCatatan = editCatatan.trim();
+    const chosenKantong = editKantong.trim() || editKategori.trim();
+    const chosenCategory = editKategori.trim() || editKantong.trim();
 
     const updated: Transaction = {
       ...editingTx,
@@ -160,8 +168,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       accountId: editAkun,
       type: editJenis,
       amount: parsedAmount,
-      category: editKategori.trim(),
-      kantong: editKantong.trim() || undefined,
+      category: chosenCategory,
+      kantong: chosenKantong || undefined,
       notes: trimmedCatatan || undefined,
       catatan: trimmedCatatan || undefined,
     };
@@ -266,14 +274,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       alert('Nominal harus lebih dari 0.');
       return;
     }
-    if (!kategori.trim()) {
-      alert('Kategori transaksi wajib dipilih.');
+    if (!kantong.trim() && !kategori.trim()) {
+      alert('Pilih Kantong atau Kategori transaksi terlebih dahulu.');
       return;
     }
 
     const trimmedCatatan = catatan.trim();
-    const chosenCategory = kategori.trim();
-    const chosenKantong = kantong.trim() || undefined;
+    const chosenKantong = kantong.trim() || kategori.trim();
+    const chosenCategory = kategori.trim() || kantong.trim();
 
     const ok = await onAddTransaction({
       date: tanggal,
@@ -281,7 +289,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       accountId: selectedAkun,
       type: jenis,
       category: chosenCategory,
-      kantong: chosenKantong,
+      kantong: chosenKantong || undefined,
       amount,
       notes: trimmedCatatan || undefined,
       catatan: trimmedCatatan || undefined,
@@ -367,6 +375,22 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     }
   };
 
+  // Ambil kantong efektif dari transaksi (mendukung data baru di kolom kantong & data skema lama di kolom category)
+  const getTxKantong = (t: Transaction): string => {
+    if (t.kantong && t.kantong.trim() && t.kantong !== '-') return t.kantong.trim();
+    if (
+      t.category &&
+      t.category.trim() &&
+      t.category !== '-' &&
+      t.category !== 'Pindah Saldo' &&
+      t.category !== 'Pindah Kantong' &&
+      !isExcludedCategory(t.category)
+    ) {
+      return t.category.trim();
+    }
+    return '';
+  };
+
   // All unique kantong for filter & recording
   const allKantong = React.useMemo(() => {
     const set = new Set<string>();
@@ -374,8 +398,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       if (!isExcludedCategory(k)) set.add(k.trim());
     });
     transactions.forEach(t => {
-      if (t.kantong && !isExcludedCategory(t.kantong)) {
-        set.add(t.kantong.trim());
+      const kt = getTxKantong(t);
+      if (kt && !isExcludedCategory(kt)) {
+        set.add(kt);
       }
     });
     return Array.from(set);
@@ -399,9 +424,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const pocketBalance = (ktName: string) => {
     const target = ktName.trim().toLowerCase();
     return transactions.reduce((sum, t) => {
-      if (!t.kantong) return sum;
-      const tKt = t.kantong.trim().toLowerCase();
-      if (tKt !== target) return sum;
+      const tKt = getTxKantong(t).toLowerCase();
+      if (!tKt || tKt !== target) return sum;
       return sum + (t.type === 'masuk' ? t.amount : -t.amount);
     }, 0);
   };
@@ -464,9 +488,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     if (skip !== 'account' && filter.accountId !== 'ALL' && t.accountId !== filter.accountId) return false;
     if (filter.type !== 'ALL' && t.type !== filter.type) return false;
     if (skip !== 'kantong' && filter.kantong && filter.kantong !== 'ALL') {
-      const tKt = (t.kantong || '').trim();
+      const tKt = getTxKantong(t);
       if (filter.kantong === 'EMPTY') {
-        if (tKt && tKt !== '-') return false;
+        if (tKt) return false;
       } else if (tKt !== filter.kantong) {
         return false;
       }
@@ -495,16 +519,21 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
   // Kantong (kartu di halaman utama): saldo tiap kantong sepanjang waktu
   const pockets = (() => {
-    const map = new Map<string, { masuk: number; keluar: number }>();
-    allKantong.forEach(kt => {
-      map.set(kt, { masuk: 0, keluar: 0 });
-    });
+    const map = new Map<string, { masuk: number; keluar: number; pindah: number }>();
+    if (kantongList && kantongList.length > 0) {
+      kantongList.forEach(kt => {
+        if (!isExcludedCategory(kt)) {
+          map.set(kt.trim(), { masuk: 0, keluar: 0, pindah: 0 });
+        }
+      });
+    }
     transactions.forEach(t => {
       if (t.category === 'Pindah Saldo') return;
-      if (!t.kantong || !t.kantong.trim() || t.kantong === '-') return;
-      const key = t.kantong.trim();
-      const row = map.get(key) || { masuk: 0, keluar: 0 };
-      if (t.type === 'masuk') row.masuk += t.amount;
+      const key = getTxKantong(t);
+      if (!key) return;
+      const row = map.get(key) || { masuk: 0, keluar: 0, pindah: 0 };
+      if (isCatTransfer(t)) row.pindah += t.type === 'masuk' ? t.amount : -t.amount;
+      else if (t.type === 'masuk') row.masuk += t.amount;
       else row.keluar += t.amount;
       map.set(key, row);
     });
@@ -514,10 +543,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         label: key,
         masuk: v.masuk,
         keluar: v.keluar,
-        pindah: 0,
-        saldo: v.masuk - v.keluar,
+        pindah: v.pindah,
+        saldo: v.masuk - v.keluar + v.pindah,
       }))
-      .sort((a, b) => (b.masuk + b.keluar) - (a.masuk + a.keluar));
+      .sort((a, b) => b.masuk + b.keluar + Math.abs(b.pindah) - (a.masuk + a.keluar + Math.abs(a.pindah)));
   })();
 
   // Selisih antara total akun dan total kantong (mis. saldo awal akun yang belum punya kantong)
@@ -527,13 +556,15 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
   // Rekap per kantong: ikut semua filter kecuali filter kantong
   const kantongRecap = (() => {
-    const map = new Map<string, { masuk: number; keluar: number }>();
+    const map = new Map<string, { masuk: number; keluar: number; pindah: number }>();
     transactions.forEach(t => {
       if (!matchesFilter(t, 'kantong')) return;
       if (t.category === 'Pindah Saldo') return;
-      const key = t.kantong && t.kantong.trim() && t.kantong !== '-' ? t.kantong : 'EMPTY';
-      const row = map.get(key) || { masuk: 0, keluar: 0 };
-      if (t.type === 'masuk') row.masuk += t.amount;
+      const kt = getTxKantong(t);
+      const key = kt || 'EMPTY';
+      const row = map.get(key) || { masuk: 0, keluar: 0, pindah: 0 };
+      if (isCatTransfer(t)) row.pindah += t.type === 'masuk' ? t.amount : -t.amount;
+      else if (t.type === 'masuk') row.masuk += t.amount;
       else row.keluar += t.amount;
       map.set(key, row);
     });
@@ -543,21 +574,22 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         label: key === 'EMPTY' ? 'Tanpa Kantong' : key,
         masuk: v.masuk,
         keluar: v.keluar,
-        pindah: 0,
-        selisih: v.masuk - v.keluar,
+        pindah: v.pindah,
+        selisih: v.masuk - v.keluar + v.pindah,
       }))
-      .sort((a, b) => (b.masuk + b.keluar) - (a.masuk + a.keluar));
+      .sort((a, b) => b.masuk + b.keluar + Math.abs(b.pindah) - (a.masuk + a.keluar + Math.abs(a.pindah)));
   })();
 
   // Rekap per kategori: ikut semua filter kecuali filter kategori
   const categoryRecap = (() => {
-    const map = new Map<string, { masuk: number; keluar: number }>();
+    const map = new Map<string, { masuk: number; keluar: number; pindah: number }>();
     transactions.forEach(t => {
       if (!matchesFilter(t, 'category')) return;
       if (t.category === 'Pindah Saldo' || t.category === 'Pindah Kantong') return;
       const key = t.category && t.category.trim() && t.category !== '-' ? t.category : 'EMPTY';
-      const row = map.get(key) || { masuk: 0, keluar: 0 };
-      if (t.type === 'masuk') row.masuk += t.amount;
+      const row = map.get(key) || { masuk: 0, keluar: 0, pindah: 0 };
+      if (isCatTransfer(t)) row.pindah += t.type === 'masuk' ? t.amount : -t.amount;
+      else if (t.type === 'masuk') row.masuk += t.amount;
       else row.keluar += t.amount;
       map.set(key, row);
     });
@@ -567,10 +599,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         label: key === 'EMPTY' ? 'Tanpa Kategori' : key,
         masuk: v.masuk,
         keluar: v.keluar,
-        pindah: 0,
-        selisih: v.masuk - v.keluar,
+        pindah: v.pindah,
+        selisih: v.masuk - v.keluar + v.pindah,
       }))
-      .sort((a, b) => (b.masuk + b.keluar) - (a.masuk + a.keluar));
+      .sort((a, b) => b.masuk + b.keluar + Math.abs(b.pindah) - (a.masuk + a.keluar + Math.abs(a.pindah)));
   })();
 
   // Rekap per akun: ikut semua filter kecuali filter akun
@@ -722,7 +754,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
     const counted = filteredList.filter(t => {
       if (t.category === 'Pindah Saldo') return filter.category === 'Pindah Saldo';
-      if (isCatTransfer(t)) return filter.category !== 'ALL';
+      if (isCatTransfer(t)) return filter.category !== 'ALL' || (filter.kantong && filter.kantong !== 'ALL');
       return true;
     });
     const totalMasuk = counted.filter(t => t.type === 'masuk').reduce((sum, t) => sum + t.amount, 0);
@@ -740,7 +772,11 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           }`
         : 'Semua Tanggal';
     const kategoriLabel =
-      filter.category === 'ALL'
+      filter.kantong && filter.kantong !== 'ALL'
+        ? filter.kantong === 'EMPTY'
+          ? 'Tanpa Kantong'
+          : filter.kantong
+        : filter.category === 'ALL'
         ? 'Semua Kantong'
         : filter.category === 'EMPTY'
         ? 'Tanpa Kategori'
@@ -862,7 +898,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: center;">${idx + 1}</td>
           <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(formatTanggalIndo(t.date))}</td>
           <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(getAccountName(t.accountId))}</td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(t.category || '-')}</td>
+          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(getTxKantong(t) || t.category || '-')}</td>
           <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(t.description)}</td>
           <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">
             ${t.type === 'masuk' ? formatRupiah(t.amount) : '-'}
@@ -1008,6 +1044,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5 leading-snug break-words">
                   +{formatRupiah(p.masuk)} · -{formatRupiah(p.keluar)}
+                  {p.pindah !== 0 && (
+                    <> · pindah {p.pindah > 0 ? '+' : '-'}{formatRupiah(Math.abs(p.pindah))}</>
+                  )}
                 </div>
               </button>
             ))}
@@ -1343,7 +1382,6 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               </label>
 
               <select
-                required
                 value={kategori}
                 onChange={(e) => {
                   if (e.target.value === '__NEW__') {
@@ -1360,7 +1398,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 }}
                 className="w-full bg-white text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer"
               >
-                <option value="" disabled>— Pilih Kategori —</option>
+                <option value="">— Pilih Kategori —</option>
                 {allCategories.map(cat => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -2202,22 +2240,33 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                         <span className={`font-medium ${t.type === 'masuk' ? 'text-emerald-700' : 'text-rose-700'}`}>
                           {t.type === 'masuk' ? 'Masuk' : 'Keluar'}
                         </span>
-                        {t.kantong && t.kantong !== '-' && (
-                          <>
-                            <span>•</span>
-                            <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
-                              {t.kantong}
-                            </span>
-                          </>
-                        )}
-                        {t.category && t.category !== '-' && (
-                          <>
-                            <span>•</span>
-                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
-                              {t.category}
-                            </span>
-                          </>
-                        )}
+                        {(() => {
+                          const kt = getTxKantong(t);
+                          const cat =
+                            t.category && t.category !== '-' && t.category !== 'Pindah Kantong'
+                              ? t.category.trim()
+                              : '';
+                          return (
+                            <>
+                              {kt && (
+                                <>
+                                  <span>•</span>
+                                  <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
+                                    {kt}
+                                  </span>
+                                </>
+                              )}
+                              {cat && cat.toLowerCase() !== kt.toLowerCase() && (
+                                <>
+                                  <span>•</span>
+                                  <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                                    {cat}
+                                  </span>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
                         {isCatTransfer(t) && (
                           <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
                             Pindah jatah
@@ -2226,7 +2275,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                         {(t.notes || t.catatan) && (
                           <>
                             <span>•</span>
-                            <span className="italic text-slate-500 max-w-[200px] truncate" title={t.notes || t.catatan}>
+                            <span className="italic text-slate-500 break-words">
                               "{t.notes || t.catatan}"
                             </span>
                           </>
@@ -2402,22 +2451,33 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     <span className={`font-medium ${isMasuk ? 'text-emerald-700' : 'text-rose-700'}`}>
                       {isMasuk ? 'Masuk' : 'Keluar'}
                     </span>
-                    {tx.kantong && tx.kantong !== '-' && (
-                      <>
-                        <span>•</span>
-                        <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
-                          {tx.kantong}
-                        </span>
-                      </>
-                    )}
-                    {tx.category && tx.category !== '-' && (
-                      <>
-                        <span>•</span>
-                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
-                          {tx.category}
-                        </span>
-                      </>
-                    )}
+                    {(() => {
+                      const kt = getTxKantong(tx);
+                      const cat =
+                        tx.category && tx.category !== '-' && tx.category !== 'Pindah Kantong'
+                          ? tx.category.trim()
+                          : '';
+                      return (
+                        <>
+                          {kt && (
+                            <>
+                              <span>•</span>
+                              <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
+                                {kt}
+                              </span>
+                            </>
+                          )}
+                          {cat && cat.toLowerCase() !== kt.toLowerCase() && (
+                            <>
+                              <span>•</span>
+                              <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                                {cat}
+                              </span>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                     {isCatTransfer(tx) && (
                       <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
                         Pindah jatah
@@ -2426,7 +2486,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     {(tx.notes || tx.catatan) && (
                       <>
                         <span>•</span>
-                        <span className="italic text-slate-500 max-w-[200px] truncate" title={tx.notes || tx.catatan}>
+                        <span className="italic text-slate-500 break-words">
                           "{tx.notes || tx.catatan}"
                         </span>
                       </>
@@ -2616,12 +2676,11 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   Kategori
                 </label>
                 <select
-                  required
                   value={editKategori}
                   onChange={(e) => setEditKategori(e.target.value)}
                   className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-xl px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                 >
-                  <option value="" disabled>— Pilih Kategori —</option>
+                  <option value="">— Pilih Kategori —</option>
                   {allCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}

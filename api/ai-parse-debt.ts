@@ -152,21 +152,24 @@ export default async function handler(req: any, res: any) {
       console.warn('List models failed:', e);
     }
 
+    const customModel = process.env.GEMINI_MODEL?.trim() || '';
+    const isRetired = (m: string) =>
+      !m || m.includes('1.5') || m.includes('2.0') || m === 'gemini-2.5-flash' || m === 'gemini-2.5-flash-lite';
+
     const preferredList = [
-      process.env.GEMINI_MODEL?.trim(),
-      'gemini-2.5-flash',
+      ...(!isRetired(customModel) ? [customModel] : []),
+      'gemini-3.8-flash',
+      'gemini-3.1-flash-lite',
       'gemini-flash-latest',
-      'gemini-2.5-pro',
-    ].filter(Boolean) as string[];
+    ];
 
     const candidateModels = Array.from(
       new Set([
-        ...preferredList.filter(m => activeModels.length === 0 || activeModels.includes(m)),
-        ...activeModels.filter(m => m.includes('flash')),
-        ...activeModels,
         ...preferredList,
+        ...activeModels.filter(m => m.includes('flash') && !isRetired(m)),
+        ...activeModels.filter(m => !isRetired(m)),
       ])
-    ).filter(m => m && !m.includes('1.5') && !m.includes('2.0'));
+    ).filter(Boolean);
 
     let raw = '';
     let lastErrorMsg = '';
@@ -198,17 +201,15 @@ export default async function handler(req: any, res: any) {
 
           if (textVal) {
             raw = textVal;
-            console.log(`✅ SDK berhasil dengan model: ${modelToTry}`);
             break;
           }
         } catch (sdkErr: any) {
-          console.error(`SDK error ${modelToTry}:`, sdkErr?.message);
           lastErrorMsg = sdkErr.message || String(sdkErr);
           continue;
         }
       }
-    } catch (sdkInitErr) {
-      console.error('SDK init error:', sdkInitErr);
+    } catch (sdkInitErr: any) {
+      lastErrorMsg = sdkInitErr?.message || String(sdkInitErr);
     }
 
     // Fallback REST

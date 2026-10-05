@@ -40,22 +40,49 @@ const toIsoString = (d: any): string | undefined => {
   return isNaN(parsed.getTime()) ? String(d) : parsed.toISOString();
 };
 
-const toTx = (r: any) => ({
-  id: r.id,
-  no: r.no ?? undefined,
-  date: toDateString(r.date),
-  description: r.description ?? '',
-  accountId: r.accountId ?? r.account_id ?? '',
-  type: (r.type === 'masuk' ? 'masuk' : 'keluar') as 'masuk' | 'keluar',
-  category: r.category ?? '',
-  kantong: r.kantong ?? undefined,
-  amount: Number(r.amount) || 0,
-  notes: r.notes ?? undefined,
-  catatan: r.notes ?? undefined,
-  transferTargetAccountId: r.transferTargetAccountId ?? r.transfer_target_account_id ?? undefined,
-  linkedTransactionId: r.linkedTransactionId ?? r.linked_transaction_id ?? undefined,
-  createdAt: toIsoString(r.createdAt ?? r.created_at),
-});
+const isSpecialNonKantong = (v?: string | null) => {
+  if (!v) return true;
+  const s = v.trim();
+  const lower = s.toLowerCase();
+  return (
+    s === '' ||
+    s === '-' ||
+    s === 'Pindah Saldo' ||
+    s === 'Pindah Kantong' ||
+    lower === 'lainnya' ||
+    lower === 'lainya' ||
+    lower === 'lain-lain' ||
+    lower === 'lain nya'
+  );
+};
+
+const toTx = (r: any) => {
+  const rawCategory = typeof r.category === 'string' ? r.category.trim() : '';
+  const rawKantong = typeof r.kantong === 'string' ? r.kantong.trim() : '';
+  const resolvedKantong =
+    rawKantong && rawKantong !== '-'
+      ? rawKantong
+      : !isSpecialNonKantong(rawCategory)
+      ? rawCategory
+      : undefined;
+
+  return {
+    id: r.id,
+    no: r.no ?? undefined,
+    date: toDateString(r.date),
+    description: r.description ?? '',
+    accountId: r.accountId ?? r.account_id ?? '',
+    type: (r.type === 'masuk' ? 'masuk' : 'keluar') as 'masuk' | 'keluar',
+    category: rawCategory,
+    kantong: resolvedKantong,
+    amount: Number(r.amount) || 0,
+    notes: r.notes ?? undefined,
+    catatan: r.notes ?? undefined,
+    transferTargetAccountId: r.transferTargetAccountId ?? r.transfer_target_account_id ?? undefined,
+    linkedTransactionId: r.linkedTransactionId ?? r.linked_transaction_id ?? undefined,
+    createdAt: toIsoString(r.createdAt ?? r.created_at),
+  };
+};
 
 const toAccount = (r: any) => ({
   id: r.id,
@@ -76,6 +103,16 @@ function toRow(tx: any): typeof transactions.$inferInsert {
   const rawNotes = tx?.catatan !== undefined ? tx.catatan : tx?.notes;
   const notes = typeof rawNotes === 'string' && rawNotes.trim().length > 0 ? rawNotes.trim() : null;
 
+  const rawCategory = typeof tx.category === 'string' ? tx.category.trim().slice(0, 50) : '';
+  const rawKantong = typeof tx.kantong === 'string' ? tx.kantong.trim().slice(0, 50) : '';
+  const category = rawCategory || rawKantong || '';
+  const kantong =
+    rawKantong && rawKantong !== '-'
+      ? rawKantong
+      : !isSpecialNonKantong(rawCategory)
+      ? rawCategory
+      : null;
+
   return {
     id: String(tx.id).slice(0, 64),
     no: tx.no ?? null,
@@ -83,8 +120,8 @@ function toRow(tx: any): typeof transactions.$inferInsert {
     description: description.slice(0, 255),
     accountId: tx.accountId || 'cash',
     type: tx.type === 'masuk' ? 'masuk' : 'keluar',
-    category: typeof tx.category === 'string' ? tx.category.slice(0, 50) : 'Lainnya',
-    kantong: typeof tx.kantong === 'string' && tx.kantong.trim() ? tx.kantong.trim().slice(0, 50) : null,
+    category,
+    kantong,
     amount: Math.round(Number(tx.amount)) || 0,
     notes,
     transferTargetAccountId: tx.transferTargetAccountId ?? null,
@@ -208,13 +245,30 @@ router.get(
       }
     }
 
+    const mappedTx = txRows.map(toTx);
+    const categoryNames = catRows.map((c: any) => String(c.name || '').trim()).filter(Boolean);
+    let kantongNames = kantongRows.map((k: any) => String(k.name || '').trim()).filter(Boolean);
+
+    // Jika tabel kantongs masih kosong tetapi ada data dari skema lama (di categories / transactions),
+    // gunakan daftar tersebut agar kantong lama langsung muncul tanpa tertimpa data dummy.
+    if (kantongNames.length === 0) {
+      const legacySet = new Set<string>();
+      categoryNames.forEach(c => {
+        if (!isSpecialNonKantong(c)) legacySet.add(c);
+      });
+      mappedTx.forEach(t => {
+        if (t.kantong && !isSpecialNonKantong(t.kantong)) legacySet.add(t.kantong);
+      });
+      kantongNames = Array.from(legacySet);
+    }
+
     res.json({
       success: true,
-      categories: catRows.map((c: any) => c.name),
-      kantongs: kantongRows.map((k: any) => k.name),
+      categories: categoryNames,
+      kantongs: kantongNames,
       storeName,
       ownerName,
-      transactions: txRows.map(toTx),
+      transactions: mappedTx,
       accounts: accRows.map(toAccount),
     });
   })

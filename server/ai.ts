@@ -1,6 +1,8 @@
+import { GoogleGenAI, Type } from '@google/genai';
 import { asc } from 'drizzle-orm';
 import { getDb } from '../src/db/index.js';
-import { accounts, categories } from '../src/db/schema.js';
+import { accounts, categories, kantongs } from '../src/db/schema.js';
+import { INITIAL_KANTONG, INITIAL_CATEGORIES } from '../src/data/initialData.js';
 import { HttpError } from './http.js';
 import { getSetting, setSetting } from './settings.js';
 
@@ -27,7 +29,7 @@ export async function checkAiRateLimit(): Promise<number> {
   return 0;
 }
 
-// Kebiasaan pencatatan (dipakai hanya jika kategorinya memang ada di database)
+// Kebiasaan pencatatan (dipakai hanya jika kantong/kategorinya memang ada di daftar pengguna)
 const CATEGORY_HINTS: { category: string; examples: string }[] = [
   { category: 'Kendaraan', examples: 'bensin, pertalite, pertamax, servis, oli, parkir, tol' },
   { category: 'Pokok', examples: 'listrik, token, wifi, pdam, sembako, beras, kontrakan' },
@@ -38,16 +40,36 @@ const CATEGORY_HINTS: { category: string; examples: string }[] = [
   { category: 'Pemasukan Toko', examples: 'pemasukan toko, penjualan, omset' },
 ];
 
+const isExcludedName = (name?: string) => {
+  if (!name) return true;
+  const lower = name.trim().toLowerCase();
+  return (
+    lower === '' ||
+    lower === '-' ||
+    lower === 'lainnya' ||
+    lower === 'lainya' ||
+    lower === 'lain-lain' ||
+    lower === 'lain nya' ||
+    lower === 'pindah saldo' ||
+    lower === 'pindah kantong'
+  );
+};
+
 function buildAiPrompt(
   accountRows: { id: string; name: string; type: string }[],
+  kantongNames: string[],
   categoryNames: string[],
   today: string,
   hasImage: boolean
 ): string {
   const accountList = accountRows.map(a => `- id "${a.id}" = ${a.name} (${a.type})`).join('\n');
+  const kantongList =
+    kantongNames.length > 0 ? kantongNames.map(k => `- ${k}`).join('\n') : '- (belum ada kantong)';
   const categoryList =
     categoryNames.length > 0 ? categoryNames.map(c => `- ${c}`).join('\n') : '- (belum ada kategori)';
-  const hints = CATEGORY_HINTS.filter(h => categoryNames.some(c => c.toLowerCase() === h.category.toLowerCase()))
+
+  const allKnown = [...kantongNames, ...categoryNames];
+  const hints = CATEGORY_HINTS.filter(h => allKnown.some(c => c.toLowerCase() === h.category.toLowerCase()))
     .map(h => `- ${h.category}: ${h.examples}`)
     .join('\n');
 
@@ -59,24 +81,29 @@ function buildAiPrompt(
     'DAFTAR AKUN (accountId HARUS salah satu id ini):',
     accountList,
     '',
-    'DAFTAR KANTONG / KATEGORI PENGGUNA:',
+    'DAFTAR KANTONG (Pos Anggaran) PENGGUNA:',
+    kantongList,
+    '',
+    'DAFTAR KATEGORI PENGGUNA:',
     categoryList,
-    hints ? `\nKebiasaan pengguna (kata kunci -> kategori):\n${hints}` : '',
+    hints ? `\nKebiasaan pengguna (kata kunci -> kantong/kategori):\n${hints}` : '',
     '',
     'ATURAN UTAMA:',
-    '1. category WAJIB persis salah satu dari daftar kantong milik pengguna di atas. Jika tidak ada yang cocok, isi "" (kosong). DILARANG membuat kategori baru di luar daftar.',
-    '2. Struk belanja = type "keluar". Kategori "Pemasukan Toko" (atau omset/pendapatan) HANYA untuk type "masuk". DILARANG memakai "Pemasukan Toko" pada belanja atau pengeluaran.',
-    '3. description hanya nama barang beserta jumlahnya (contoh "1 Sak Semen Singa Merah"), tanpa nama toko. Struk berisi banyak barang: buat SATU transaksi dengan total akhir, description = barang utama atau "Belanja <nama toko>".',
-    '4. Satu transaksi per kejadian uang masuk/keluar. Satu baris teks biasanya satu transaksi. Abaikan teks yang bukan transaksi (sapaan, saldo akhir, nomor referensi, promo).',
-    '5. amount = bilangan bulat Rupiah tanpa titik/koma. "30rb" atau "30k" = 30000, "1,5jt" = 1500000, "125.000" = 125000, "Rp 2.500.000,00" = 2500000. Untuk notifikasi bank, pakai nominal transaksi, bukan saldo.',
-    '6. type: "keluar" untuk belanja, bayar, beli, tagihan, ongkir; "masuk" untuk pemasukan, penjualan, omset, terima, gaji. Jika ragu, pilih "keluar".',
-    '7. accountId: cocokkan nama atau alias yang disebut (mis. "tunai" = akun Cash, "spay" = ShopeePay). Jika tidak disebut, pakai akun bertipe cash; jika tidak ada, akun pertama.',
-    `8. date: format YYYY-MM-DD. Pakai tanggal pada teks/struk; "kemarin" = sehari sebelum tanggal hari ini. Jika tahun tidak tertulis, pakai tahun ${today.slice(0, 4)}. Jika tanggal tidak ada, pakai tanggal hari ini.`,
-    '9. Pemindahan saldo antar akun (mis. "pindah 50rb dari seabank ke cash"): SATU entri dengan accountId = akun asal, transferToAccountId = akun tujuan, type "keluar", category "Pindah Saldo". Untuk transaksi biasa, transferToAccountId = "".',
+    '1. kantong WAJIB persis salah satu dari DAFTAR KANTONG (Pos Anggaran) di atas. Jika tidak ada yang cocok, isi "" (kosong).',
+    '2. category WAJIB persis salah satu dari DAFTAR KATEGORI di atas. Jika tidak ada yang cocok, isi "" (kosong).',
+    '3. Struk belanja = type "keluar". Kantong/Kategori "Pemasukan Toko" (atau omset/pendapatan) HANYA untuk type "masuk". DILARANG memakai "Pemasukan Toko" pada belanja atau pengeluaran.',
+    '4. description (Nama / Judul): jika struk berisi banyak barang, tulis "Belanja <nama toko>" (contoh "Belanja Karis Jaya Shop") atau nama belanja utama. Jika hanya 1 barang, tulis nama barang beserta jumlahnya (contoh "1 Sak Semen Singa Merah").',
+    '5. notes (Catatan): WAJIB isi otomatis HANYA dengan rincian setiap nama item belanja beserta rincian qty x harga satuan dan subtotal per item (contoh: "1. Indomie Goreng (1 lusin x 36.000 = Rp 36.000), 2. Fruit Tea Apple (1 500 ml x 7.000 = Rp 7.000), 3. Belfood Sosis Bakar (1 x 27.000 = Rp 27.000)"). DILARANG mengisi nomor nota (seperti No.0-3), nomor referensi, alamat toko, nama kasir, atau teks lain selain rincian item & harganya. Jika input hanya 1 item singkat tanpa rincian beberapa barang, boleh tulis rincian item & harganya atau "".',
+    '6. Satu transaksi per kejadian uang masuk/keluar. Satu baris teks biasanya satu transaksi. Abaikan teks yang bukan transaksi (sapaan, saldo akhir, nomor referensi, promo).',
+    '7. amount (Nominal Rp) = bilangan bulat Rupiah tanpa titik/koma. "30rb" atau "30k" = 30000, "1,5jt" = 1500000, "125.000" = 125000, "Rp 2.500.000,00" = 2500000. Untuk notifikasi bank, pakai nominal transaksi, bukan saldo.',
+    '8. type: "keluar" untuk belanja, bayar, beli, tagihan, ongkir; "masuk" untuk pemasukan, penjualan, omset, terima, gaji. Jika ragu, pilih "keluar".',
+    '9. accountId: cocokkan nama atau alias yang disebut (mis. "tunai" = akun Cash, "spay" = ShopeePay). Jika tidak disebut, pakai akun bertipe cash; jika tidak ada, akun pertama.',
+    `10. date: format YYYY-MM-DD. Pakai tanggal pada teks/struk; "kemarin" = sehari sebelum tanggal hari ini. Jika tahun tidak tertulis, pakai tahun ${today.slice(0, 4)}. Jika tanggal tidak ada, pakai tanggal hari ini.`,
+    '11. Pemindahan saldo antar akun (mis. "pindah 50rb dari seabank ke cash"): SATU entri dengan accountId = akun asal, transferToAccountId = akun tujuan, type "keluar", category "Pindah Saldo", kantong "". Untuk transaksi biasa, transferToAccountId = "".',
     hasImage
-      ? '10. Jika gambar adalah catatan atau daftar banyak baris bertanggal (mis. screenshot catatan): buat SATU transaksi per baris. Jika struk belanja: buat SATU transaksi "keluar" dengan total akhir yang dibayar.'
+      ? '12. Jika gambar adalah catatan atau daftar banyak baris bertanggal (mis. screenshot catatan): buat SATU transaksi per baris. Jika struk belanja: buat SATU transaksi "keluar" dengan total akhir yang dibayar.'
       : '',
-    '11. Jika tidak ada transaksi yang bisa dibaca, kembalikan array kosong [].',
+    '13. Jika tidak ada transaksi yang bisa dibaca, kembalikan array kosong [].',
   ]
     .filter(Boolean)
     .join('\n');
@@ -90,18 +117,32 @@ export interface AiInput {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const isRetiredModel = (modelName: string) =>
+  !modelName ||
+  modelName.includes('1.5') ||
+  modelName.includes('2.0') ||
+  modelName === 'gemini-2.5-flash' ||
+  modelName === 'gemini-2.5-flash-lite' ||
+  modelName === 'gemini-pro';
+
 function getModelCandidates(): string[] {
-  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
-  const fallbackEnv = process.env.GEMINI_FALLBACK_MODELS?.trim() || 'gemini-2.5-flash-lite';
-  const fallbacks = fallbackEnv
+  const customPrimary = process.env.GEMINI_MODEL?.trim() || '';
+  const customFallbacks = (process.env.GEMINI_FALLBACK_MODELS || '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
-  return Array.from(new Set([primaryModel, ...fallbacks]));
+
+  const defaults = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const all = [
+    ...(!isRetiredModel(customPrimary) ? [customPrimary] : []),
+    ...defaults,
+    ...customFallbacks.filter(m => !isRetiredModel(m)),
+  ];
+  return Array.from(new Set(all));
 }
 
 export async function runAiParse(input: AiInput) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) throw new HttpError(500, 'GEMINI_API_KEY belum diisi di server.');
 
   const text = String(input.text || '').slice(0, 8000);
@@ -120,202 +161,222 @@ export async function runAiParse(input: AiInput) {
     { id: 'seabank', name: 'Seabank', type: 'bank' },
     { id: 'shoopepay', name: 'Shoopepay', type: 'ewallet' },
   ];
-  let categoryNames = ['Pribadi', 'Pokok', 'Kendaraan', 'Bangun Rumah', 'Operasional Toko', 'Pemasukan Toko'];
+  let kantongNames = INITIAL_KANTONG.filter(k => !isExcludedName(k));
+  let categoryNames = INITIAL_CATEGORIES.filter(c => !isExcludedName(c));
 
   const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
   if (dbUrl) {
     try {
       const db = getDb();
-      const a = await db
-        .select({ id: accounts.id, name: accounts.name, type: accounts.type })
-        .from(accounts)
-        .orderBy(asc(accounts.id));
-      const c = await db.select({ name: categories.name }).from(categories).orderBy(asc(categories.name));
+      const [a, k, c] = await Promise.all([
+        db.select({ id: accounts.id, name: accounts.name, type: accounts.type }).from(accounts).orderBy(asc(accounts.id)),
+        db.select({ name: kantongs.name }).from(kantongs).orderBy(asc(kantongs.name)).catch(() => []),
+        db.select({ name: categories.name }).from(categories).orderBy(asc(categories.name)).catch(() => []),
+      ]);
       if (a.length > 0) accountRows = a;
-      if (c.length > 0) categoryNames = c.map(r => r.name);
+
+      const dbKantongs = k.map(r => r.name?.trim()).filter(n => !isExcludedName(n));
+      const dbCategories = c.map(r => r.name?.trim()).filter(n => !isExcludedName(n));
+
+      if (dbKantongs.length > 0) {
+        kantongNames = Array.from(new Set(dbKantongs));
+      } else if (dbCategories.length > 0) {
+        kantongNames = Array.from(new Set(dbCategories));
+      }
+
+      if (dbCategories.length > 0) {
+        categoryNames = Array.from(new Set([...dbCategories, ...INITIAL_CATEGORIES.filter(x => !isExcludedName(x))]));
+      }
     } catch (e) {
-      console.warn('Gagal membaca akun/kategori dari DB untuk AI, menggunakan default:', e);
+      console.warn('Gagal membaca akun/kantong dari DB untuk AI, menggunakan default:', e);
     }
   }
 
   const accountIds = accountRows.map(a => a.id);
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
 
-  const parts: any[] = [{ text: buildAiPrompt(accountRows, categoryNames, today, Boolean(imageBase64)) }];
+  const parts: any[] = [{ text: buildAiPrompt(accountRows, kantongNames, categoryNames, today, Boolean(imageBase64)) }];
   if (text.trim()) parts.push({ text: `TEKS INPUT:\n${text}` });
   if (imageBase64) parts.push({ inlineData: { mimeType, data: imageBase64 } });
 
   const responseSchema = {
-    type: 'ARRAY',
+    type: Type.ARRAY,
     items: {
-      type: 'OBJECT',
+      type: Type.OBJECT,
       properties: {
-        date: { type: 'STRING' },
-        description: { type: 'STRING' },
-        accountId: { type: 'STRING', enum: accountIds },
-        type: { type: 'STRING', enum: ['masuk', 'keluar'] },
-        category: { type: 'STRING' },
-        amount: { type: 'INTEGER' },
-        transferToAccountId: { type: 'STRING' },
+        date: { type: Type.STRING },
+        description: { type: Type.STRING },
+        accountId: { type: Type.STRING, enum: accountIds },
+        type: { type: Type.STRING, enum: ['masuk', 'keluar'] },
+        kantong: { type: Type.STRING },
+        category: { type: Type.STRING },
+        amount: { type: Type.INTEGER },
+        notes: { type: Type.STRING },
+        transferToAccountId: { type: Type.STRING },
       },
-      required: ['date', 'description', 'accountId', 'type', 'category', 'amount', 'transferToAccountId'],
+      required: ['date', 'description', 'accountId', 'type', 'kantong', 'category', 'amount', 'notes', 'transferToAccountId'],
     },
   };
 
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+
   const models = getModelCandidates();
-  // Jeda retry: 1 dtk, 2 dtk, 4 dtk (+ sedikit acak)
   const retryDelays = [
-    1000 + Math.floor(Math.random() * 300),
-    2000 + Math.floor(Math.random() * 500),
-    4000 + Math.floor(Math.random() * 800),
+    900 + Math.floor(Math.random() * 250),
+    1800 + Math.floor(Math.random() * 400),
   ];
 
   let lastStatus = 0;
   let lastErrorMessage = '';
+  let rawOutput = '';
 
   modelLoop: for (let mIndex = 0; mIndex < models.length; mIndex++) {
     const currentModel = models[mIndex];
 
-    for (let attempt = 0; attempt <= 3; attempt++) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 45000);
-      let gRes: Response | null = null;
-      let networkErr: any = null;
-
+    for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
       try {
-        gRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts }],
-              generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema },
-            }),
-            signal: controller.signal,
-          }
-        );
+        const aiRes = await ai.models.generateContent({
+          model: currentModel,
+          contents: { parts },
+          config: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+            responseSchema,
+          },
+        });
+
+        const textVal =
+          aiRes?.text ||
+          (aiRes?.candidates?.[0]?.content?.parts || [])
+            .map((p: any) => p.text || '')
+            .join('');
+
+        if (textVal) {
+          rawOutput = textVal;
+          break modelLoop;
+        }
       } catch (err: any) {
-        networkErr = err;
-      } finally {
-        clearTimeout(timer);
-      }
+        const status = Number(err?.status || err?.httpStatusCode || 0) ||
+          (String(err?.message || '').includes('404') || String(err?.message || '').includes('NOT_FOUND') ? 404 :
+           String(err?.message || '').includes('429') ? 429 :
+           String(err?.message || '').includes('503') ? 503 :
+           String(err?.message || '').includes('403') || String(err?.message || '').includes('401') ? 403 : 500);
 
-      if (networkErr) {
-        console.error(`Gemini network error [${currentModel}] attempt ${attempt + 1}:`, networkErr?.message || networkErr);
-        lastStatus = 503;
-        lastErrorMessage = 'Server AI sedang sibuk. Coba lagi beberapa saat.';
+        lastStatus = status;
 
-        // Retry maksimal 3 kali untuk error jaringan
-        if (attempt < 3) {
+        if (status === 401 || status === 403) {
+          throw new HttpError(403, 'API key Gemini tidak valid atau ditolak.');
+        }
+        if (status === 400) {
+          throw new HttpError(400, 'AI gagal memproses permintaan (kode 400).');
+        }
+        if (status === 413) {
+          throw new HttpError(413, 'Foto terlalu besar.');
+        }
+
+        if (status === 404) {
+          lastErrorMessage = 'Model Gemini tidak ditemukan.';
+          continue modelLoop;
+        }
+
+        const isRetryable = [429, 500, 503, 504].includes(status);
+        if (status === 503 || status === 429) {
+          lastErrorMessage = 'Server AI sedang sibuk. Coba lagi beberapa saat.';
+        } else {
+          lastErrorMessage = `AI gagal memproses (kode ${status}).`;
+        }
+
+        if (isRetryable && attempt < retryDelays.length) {
           await sleep(retryDelays[attempt]);
           continue;
         }
-        // Jika retry model ini habis, pindah ke model berikutnya
+
         continue modelLoop;
       }
-
-      if (!gRes) {
-        lastStatus = 503;
-        lastErrorMessage = 'Server AI sedang sibuk. Coba lagi beberapa saat.';
-        continue modelLoop;
-      }
-
-      if (gRes.ok) {
-        const gJson: any = await gRes.json();
-        const raw = (gJson?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('');
-        let items: any;
-        try {
-          items = JSON.parse(raw);
-        } catch {
-          throw new HttpError(502, 'Jawaban AI tidak bisa dibaca. Coba lagi.');
-        }
-
-        // Validasi ulang hasil AI sebelum dikirim ke aplikasi
-        const accountIdSet = new Set<string>(accountIds);
-        const categoryMap = new Map<string, string>(
-          categoryNames.map(c => [c.trim().toLowerCase(), c.trim()] as [string, string])
-        );
-
-        return (Array.isArray(items) ? items : [])
-          .slice(0, 50)
-          .map((it: any) => {
-            const accountId = accountIdSet.has(it?.accountId) ? it.accountId : accountIds[0];
-            const toId =
-              accountIdSet.has(it?.transferToAccountId) && it.transferToAccountId !== accountId
-                ? it.transferToAccountId
-                : '';
-            const rawType = String(it?.type || '').toLowerCase();
-            const type: 'masuk' | 'keluar' = toId ? 'keluar' : rawType === 'masuk' ? 'masuk' : 'keluar';
-
-            // Category WAJIB persis salah satu dari daftar pengguna, jika tidak cocok isi ""
-            let cat = toId ? 'Pindah Saldo' : categoryMap.get(String(it?.category || '').trim().toLowerCase()) || '';
-            // Struk/pengeluaran tidak boleh memakai "Pemasukan Toko"
-            if (type === 'keluar' && cat.toLowerCase() === 'pemasukan toko') {
-              cat = '';
-            }
-
-            return {
-              date: /^\d{4}-\d{2}-\d{2}$/.test(String(it?.date || '')) ? it.date : today,
-              description: String(it?.description || '').trim().slice(0, 255) || 'Transaksi',
-              accountId,
-              type,
-              category: cat,
-              amount: Math.round(Number(it?.amount) || 0),
-              transferToAccountId: toId,
-            };
-          })
-          .filter(t => t.amount > 0);
-      }
-
-      // Response tidak OK: ambil status dan teks error asli dari Gemini
-      const status = gRes.status;
-      const errorText = await gRes.text().catch(() => '');
-      console.error(`Gemini API error [${currentModel}] status ${status}:`, errorText);
-
-      lastStatus = status;
-
-      // Error yang TIDAK boleh diretry dan langsung ditolak:
-      if (status === 401 || status === 403) {
-        throw new HttpError(403, 'API key Gemini tidak valid atau ditolak.');
-      }
-      if (status === 400) {
-        throw new HttpError(400, 'AI gagal memproses (kode 400).');
-      }
-      if (status === 413) {
-        throw new HttpError(413, 'Foto terlalu besar.');
-      }
-
-      // Jika 404 (Model tidak ditemukan), jangan retry model yang sama, langsung pindah ke model berikutnya
-      if (status === 404) {
-        lastErrorMessage = 'Model Gemini tidak ditemukan. Periksa GEMINI_MODEL.';
-        continue modelLoop;
-      }
-
-      // Status yang boleh diretry: 429, 500, 503, 504
-      const isRetryable = [429, 500, 503, 504].includes(status);
-      if (status === 503 || status === 429) {
-        lastErrorMessage = 'Server AI sedang sibuk. Coba lagi beberapa saat.';
-      } else {
-        lastErrorMessage = `AI gagal memproses (kode ${status}).`;
-      }
-
-      if (isRetryable && attempt < 3) {
-        await sleep(retryDelays[attempt]);
-        continue;
-      }
-
-      // Retry model ini sudah habis, lanjut ke model berikutnya
-      continue modelLoop;
     }
   }
 
-  // Semua model dan retry telah dicoba namun tetap gagal
+  if (rawOutput) {
+    let items: any;
+    try {
+      items = JSON.parse(rawOutput);
+    } catch {
+      const fenceMatch = rawOutput.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (fenceMatch) {
+        try {
+          items = JSON.parse(fenceMatch[1]);
+        } catch {
+          throw new HttpError(502, 'Jawaban AI tidak bisa dibaca. Coba lagi.');
+        }
+      } else {
+        throw new HttpError(502, 'Jawaban AI tidak bisa dibaca. Coba lagi.');
+      }
+    }
+
+    const accountIdSet = new Set<string>(accountIds);
+    const kantongMap = new Map<string, string>(
+      kantongNames.map(k => [k.trim().toLowerCase(), k.trim()] as [string, string])
+    );
+    const categoryMap = new Map<string, string>(
+      categoryNames.map(c => [c.trim().toLowerCase(), c.trim()] as [string, string])
+    );
+
+    return (Array.isArray(items) ? items : [])
+      .slice(0, 50)
+      .map((it: any) => {
+        const accountId = accountIdSet.has(it?.accountId) ? it.accountId : accountIds[0];
+        const toId =
+          accountIdSet.has(it?.transferToAccountId) && it.transferToAccountId !== accountId
+            ? it.transferToAccountId
+            : '';
+        const rawType = String(it?.type || '').toLowerCase();
+        const type: 'masuk' | 'keluar' = toId ? 'keluar' : rawType === 'masuk' ? 'masuk' : 'keluar';
+
+        const rawKt = String(it?.kantong || '').trim().toLowerCase();
+        const rawCat = String(it?.category || '').trim().toLowerCase();
+
+        let kt = toId
+          ? ''
+          : kantongMap.get(rawKt) || kantongMap.get(rawCat) || '';
+
+        let cat = toId
+          ? 'Pindah Saldo'
+          : categoryMap.get(rawCat) || categoryMap.get(rawKt) || '';
+
+        if (type === 'keluar') {
+          if (kt.toLowerCase() === 'pemasukan toko') kt = '';
+          if (cat.toLowerCase() === 'pemasukan toko') cat = '';
+        }
+
+        const notes = String(it?.notes || '').trim().slice(0, 1500);
+
+        return {
+          date: /^\d{4}-\d{2}-\d{2}$/.test(String(it?.date || '')) ? it.date : today,
+          description: String(it?.description || '').trim().slice(0, 255) || 'Transaksi',
+          accountId,
+          type,
+          kantong: kt,
+          category: cat,
+          amount: Math.round(Number(it?.amount) || 0),
+          notes,
+          transferToAccountId: toId,
+        };
+      })
+      .filter(t => t.amount > 0);
+  }
+
   if (lastStatus === 503 || lastStatus === 429) {
     throw new HttpError(503, 'Server AI sedang sibuk. Coba lagi beberapa saat.');
   }
   if (lastStatus === 404) {
-    throw new HttpError(404, 'Model Gemini tidak ditemukan. Periksa GEMINI_MODEL.');
+    throw new HttpError(404, 'Model Gemini tidak ditemukan. Periksa konfigurasi model.');
   }
   if (lastStatus === 413) {
     throw new HttpError(413, 'Foto terlalu besar.');

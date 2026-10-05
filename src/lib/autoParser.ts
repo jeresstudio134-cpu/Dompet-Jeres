@@ -6,8 +6,10 @@ export interface ParsedTransactionResult {
   description: string;
   accountId: string;
   type: TransactionType;
+  kantong?: string;
   category: string;
   amount: number;
+  notes?: string;
   transferTargetAccountId?: string;
   confidence: number;
   rawText: string;
