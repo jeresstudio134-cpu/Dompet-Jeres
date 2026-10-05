@@ -6,6 +6,10 @@ let ready: Promise<void> | null = null;
 // Membuat tabel kalau belum ada. Aman dijalankan berulang dan tidak mengubah data.
 // Kalau mengubah schema.ts, ubah juga di sini (atau jalankan `npm run db:push`).
 export function ensureSchema(): Promise<void> {
+  const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+  if (!url) {
+    return Promise.resolve();
+  }
   if (!ready) {
     ready = (async () => {
       const db = getDb();
@@ -56,6 +60,7 @@ export function ensureSchema(): Promise<void> {
       await Promise.all([
         db.execute(sql`CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (date)`),
         db.execute(sql`CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)`),
+        db.execute(sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT`),
       ]);
     })().catch(err => {
       ready = null; // coba lagi di permintaan berikutnya

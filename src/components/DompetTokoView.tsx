@@ -116,7 +116,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     setEditJenis(tx.type);
     setEditNominalStr(tx.amount.toLocaleString('id-ID'));
     setEditKategori(tx.category || '');
-    setEditCatatan(tx.notes || '');
+    setEditCatatan(tx.notes || tx.catatan || '');
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -133,6 +133,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       return;
     }
 
+    const trimmedCatatan = editCatatan.trim();
+
     const updated: Transaction = {
       ...editingTx,
       date: editDate,
@@ -141,7 +143,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       type: editJenis,
       amount: parsedAmount,
       category: editKategori.trim(),
-      notes: editCatatan.trim() || undefined,
+      notes: trimmedCatatan || undefined,
+      catatan: trimmedCatatan || undefined,
     };
 
     onEditTransaction(updated);
@@ -1734,6 +1737,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                             Pindah kategori
                           </span>
                         )}
+                        {(t.notes || t.catatan) && (
+                          <>
+                            <span>•</span>
+                            <span className="italic text-slate-500 max-w-[200px] truncate" title={t.notes || t.catatan}>
+                              "{t.notes || t.catatan}"
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                     {isAdmin && (
@@ -1917,6 +1928,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                       <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
                         Pindah kategori
                       </span>
+                    )}
+                    {(tx.notes || tx.catatan) && (
+                      <>
+                        <span>•</span>
+                        <span className="italic text-slate-500 max-w-[200px] truncate" title={tx.notes || tx.catatan}>
+                          "{tx.notes || tx.catatan}"
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>

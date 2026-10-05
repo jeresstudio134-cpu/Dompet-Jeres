@@ -26,19 +26,16 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
   onAddTransactions,
   accounts,
   categories,
-  onAddCategory,
 }) => {
   const [activeTab, setActiveTab] = useState<'text' | 'receipt'>('text');
   const [textInput, setTextInput] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [lastReceiptFile, setLastReceiptFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [newCatTargetKey, setNewCatTargetKey] = useState<string | null>(null);
-  const [newCatName, setNewCatName] = useState('');
-  const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const keyRef = useRef(0);
 
@@ -75,6 +72,7 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
     setTextInput('');
     setItems([]);
     setReceiptImage(null);
+    setLastReceiptFile(null);
     setError(null);
     setNotice(null);
   };
@@ -99,36 +97,24 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
     setItems(prev => prev.filter(i => i.key !== key));
   };
 
-  const handleAddNewCategory = async (targetKey: string, rawName: string) => {
-    const trimmed = rawName.trim().slice(0, 50);
-    if (!trimmed) {
-      setNewCatTargetKey(null);
-      return;
-    }
-    setExtraCategories(prev => Array.from(new Set([...prev, trimmed])));
-    updateItem(targetKey, { category: trimmed });
-    if (onAddCategory) {
-      try {
-        await onAddCategory(trimmed);
-      } catch (err) {
-        console.warn('Add category error:', err);
-      }
-    }
-    setNewCatTargetKey(null);
-    setNewCatName('');
+  // Validasi sebelum simpan: nominal > 0, tanggal valid, kantong dipilih
+  const isItemValid = (it: Item) => {
+    const isTransfer = Boolean(it.transferTargetAccountId);
+    const hasCategory = isTransfer || Boolean(it.category && it.category.trim());
+    return (
+      it.amount > 0 &&
+      it.description.trim().length > 0 &&
+      /^\d{4}-\d{2}-\d{2}$/.test(it.date) &&
+      accounts.some(a => a.id === it.accountId) &&
+      hasCategory
+    );
   };
-
-  const isItemValid = (it: Item) =>
-    it.amount > 0 &&
-    it.description.trim().length > 0 &&
-    /^\d{4}-\d{2}-\d{2}$/.test(it.date) &&
-    accounts.some(a => a.id === it.accountId);
 
   const allValid = items.length > 0 && items.every(isItemValid);
 
-  // Analisis teks dengan AI; jika gagal, pakai pembaca lokal
+  // Analisis teks dengan AI; jika gagal, pakai pembaca lokal dengan kantong kosong
   const handleAnalyze = async () => {
-    if (!textInput.trim()) return;
+    if (!textInput.trim() || isLoading) return;
     setIsLoading(true);
     setError(null);
     setNotice(null);
@@ -139,15 +125,22 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
         setNotice('AI tidak menemukan transaksi pada teks ini. Coba tulis dengan nominal yang jelas.');
       }
       setItems(withKeys(res));
-    } catch (_err: any) {
+    } catch (err: any) {
+      console.warn('AI parse error, mencoba fallback lokal:', err);
       const local = parseMultiLineText(textInput);
       if (local.length > 0) {
-        setItems(withKeys(local));
+        // Hasil pembaca lokal (fallback) TIDAK boleh mengisi kantong otomatis.
+        // Kantong kosong dengan placeholder "Pilih kantong", dan tombol Simpan nonaktif sampai kantong dipilih.
+        const localItems = local.map(it => ({
+          ...it,
+          category: '', // wajib kosong agar pengguna memilih kantong sendiri
+        }));
+        setItems(withKeys(localItems));
         setNotice(
-          'Hasil di bawah diekstrak dengan pembaca cerdas lokal. Periksa kembali tanggal, nominal, dan kategori sebelum disimpan.'
+          'Hasil diekstrak dengan pembaca cerdas lokal. Silakan pilih kantong untuk masing-masing transaksi sebelum disimpan.'
         );
       } else {
-        setError('Gagal membaca transaksi. Pastikan ada nominal pada teks yang dimasukkan.');
+        setError(err?.message || 'Server AI sedang sibuk. Coba lagi beberapa saat.');
       }
     } finally {
       setIsLoading(false);
@@ -156,11 +149,13 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
 
   // Scan foto struk dengan AI
   const processFile = async (file: File) => {
+    setLastReceiptFile(file);
     setError(null);
     setNotice(null);
     setItems([]);
     setIsLoading(true);
     try {
+      // 1. Sebelum dikirim, kompres foto (max 1600px, JPEG 0.7, target < 1MB)
       const img = await compressImage(file);
       setReceiptImage(img.preview);
       const res = await parseReceiptWithGemini(img.base64, img.mimeType);
@@ -169,8 +164,9 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
       }
       setItems(withKeys(res));
     } catch (err: any) {
-      console.error('Scan failed:', err);
-      setError(err.message || 'Gagal memindai struk. Coba foto yang lebih terang atau ketik di tab teks.');
+      console.error('Scan receipt failed:', err);
+      // Foto tidak bisa diproses oleh pembaca lokal. Jika AI gagal untuk foto:
+      setError('Foto butuh AI. Coba lagi atau ketik manual.');
     } finally {
       setIsLoading(false);
     }
@@ -182,12 +178,27 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
     if (file) processFile(file);
   };
 
-  // Simpan semua baris pratinjau
+  // Tombol "Coba lagi" pada pesan error
+  const handleRetry = () => {
+    if (isLoading) return;
+    if (activeTab === 'text') {
+      handleAnalyze();
+    } else if (activeTab === 'receipt') {
+      if (lastReceiptFile) {
+        processFile(lastReceiptFile);
+      } else {
+        fileInputRef.current?.click();
+      }
+    }
+  };
+
+  // Simpan semua baris pratinjau (setelah validasi)
   const handleSave = async () => {
-    if (!allValid) return;
+    if (!allValid || isSaving) return;
 
     const toSave: Omit<Transaction, 'id'>[] = [];
     for (const it of items) {
+      if (it.amount <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(it.date)) continue;
       const target = it.transferTargetAccountId;
       const isTransfer = Boolean(target) && target !== it.accountId && accounts.some(a => a.id === target);
 
@@ -214,54 +225,45 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
           }
         );
       } else {
+        // Validasi kantong dipilih
+        if (!it.category || !it.category.trim()) continue;
         toSave.push({
           date: it.date,
-          description: it.description.trim(),
+          description: it.description.trim() || 'Transaksi',
           accountId: it.accountId,
           type: it.type,
-          category: it.category || (it.type === 'masuk' ? 'Toko' : 'Pribadi'),
+          category: it.category.trim(),
           amount: it.amount,
         });
       }
     }
 
+    if (toSave.length === 0) return;
+
     setIsSaving(true);
     try {
-      // 1. Simpan semua kategori baru secara otomatis ke database & daftar kategori
-      const newCategoriesToPersist = Array.from(
-        new Set(
-          toSave
-            .map(t => t.category?.trim())
-            .filter((c): c is string => Boolean(c && c !== 'Pindah Saldo' && !categories.includes(c)))
-        )
-      );
-      if (newCategoriesToPersist.length > 0 && onAddCategory) {
-        for (const cat of newCategoriesToPersist) {
-          try {
-            await onAddCategory(cat);
-          } catch (e) {
-            console.warn('Auto add category error:', e);
-          }
-        }
-      }
-
       const ok = await onAddTransactions(toSave);
-      if (ok === false) return; // gagal simpan: pratinjau dibiarkan agar bisa dicoba lagi
+      if (ok === false) return;
       confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
       handleClose();
+    } catch (err: any) {
+      console.error('Failed saving transactions:', err);
+      setError(err?.message || 'Gagal menyimpan transaksi ke database.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const nonTransfer = items.filter(i => !i.transferTargetAccountId);
-  const totalMasuk = nonTransfer.filter(i => i.type === 'masuk').reduce((s, i) => s + i.amount, 0);
-  const totalKeluar = nonTransfer.filter(i => i.type === 'keluar').reduce((s, i) => s + i.amount, 0);
+  const totalMasuk = items.filter(i => i.type === 'masuk').reduce((sum, i) => sum + i.amount, 0);
+  const totalKeluar = items.filter(i => i.type === 'keluar').reduce((sum, i) => sum + i.amount, 0);
+
+  // Dropdown kantong HANYA berisi kantong yang ada milik pengguna
+  const availableCategories = categories.filter(c => Boolean(c && c !== 'Pindah Saldo'));
 
   const renderItems = () => {
     if (items.length === 0) return null;
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 pt-2">
         <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-300">
           <span className="font-bold text-emerald-400">Ditemukan {items.length} transaksi</span>
           <span>
@@ -273,14 +275,11 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
           {items.map(it => {
             const valid = isItemValid(it);
             const isTransfer = Boolean(it.transferTargetAccountId);
-            const catOptions = Array.from(
-              new Set([...categories, ...extraCategories, it.category].filter(Boolean))
-            );
 
             return (
               <div
                 key={it.key}
-                className={`rounded-xl border p-2.5 space-y-2 ${
+                className={`rounded-xl border p-2.5 space-y-2 transition ${
                   valid ? 'bg-slate-800/70 border-slate-700/60' : 'bg-rose-950/30 border-rose-500/50'
                 }`}
               >
@@ -289,7 +288,7 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
                     type="text"
                     value={it.description}
                     onChange={e => updateItem(it.key, { description: e.target.value })}
-                    placeholder="Keterangan"
+                    placeholder="Keterangan (contoh: 1 Sak Semen)"
                     className={inputCls}
                   />
                   <button
@@ -348,64 +347,18 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
                   ) : (
                     <select
                       value={it.category}
-                      onChange={e => {
-                        if (e.target.value === '__ADD_NEW__') {
-                          setNewCatTargetKey(it.key);
-                          setNewCatName('');
-                        } else {
-                          updateItem(it.key, { category: e.target.value });
-                        }
-                      }}
-                      className={inputCls}
+                      onChange={e => updateItem(it.key, { category: e.target.value })}
+                      className={`${inputCls} ${!it.category ? 'border-amber-400/80 text-amber-200' : ''}`}
                     >
-                      <option value="">— Pilih Kantong —</option>
-                      {catOptions.map(c => (
+                      <option value="">Pilih kantong</option>
+                      {availableCategories.map(c => (
                         <option key={c} value={c}>
                           {c}
                         </option>
                       ))}
-                      <option value="__ADD_NEW__" className="text-emerald-400 font-bold bg-slate-800">
-                        ➕ Tambah Kantong Baru...
-                      </option>
                     </select>
                   )}
                 </div>
-
-                {newCatTargetKey === it.key && (
-                  <div className="flex items-center gap-1.5 p-1.5 bg-slate-900 rounded-lg border border-emerald-500/60 animate-in fade-in">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={newCatName}
-                      placeholder="Nama kantong baru..."
-                      onChange={e => setNewCatName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddNewCategory(it.key, newCatName);
-                        } else if (e.key === 'Escape') {
-                          setNewCatTargetKey(null);
-                        }
-                      }}
-                      className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 px-2 py-1 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddNewCategory(it.key, newCatName)}
-                      disabled={!newCatName.trim()}
-                      className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold disabled:opacity-40 transition cursor-pointer"
-                    >
-                      Simpan
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewCatTargetKey(null)}
-                      className="p-1 text-slate-400 hover:text-white transition cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
 
                 {isTransfer ? (
                   <div className="text-[11px] text-sky-300">💡 Pindah saldo antar akun</div>
@@ -441,8 +394,8 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
         </div>
 
         {!allValid && (
-          <p className="text-[11px] text-rose-300">
-            Lengkapi baris bertanda merah (nominal, keterangan, tanggal, dan akun) sebelum menyimpan.
+          <p className="text-[11px] text-amber-300">
+            Lengkapi nominal (&gt; 0), tanggal, dan pilih kantong untuk semua transaksi sebelum menyimpan.
           </p>
         )}
 
@@ -450,7 +403,7 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
           type="button"
           onClick={handleSave}
           disabled={!allValid || isSaving}
-          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 text-white font-bold text-sm shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 text-white font-bold text-sm shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <Check className="w-4 h-4" />
           <span>{isSaving ? 'Menyimpan...' : `Simpan ${items.length} Transaksi`}</span>
@@ -569,7 +522,7 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
                   </div>
                   <div className="font-semibold text-white text-sm">Upload atau Ambil Foto Struk / Nota</div>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    AI akan membaca total, toko, tanggal, dan barang utama dari struk.
+                    AI akan membaca total belanja, tanggal, dan nama barang utama dari struk.
                   </p>
                 </div>
               )}
@@ -592,10 +545,22 @@ export const AutoRecordModal: React.FC<AutoRecordModalProps> = ({
             </div>
           )}
 
+          {/* Pesan Error dengan Tombol Coba Lagi */}
           {error && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-center justify-between gap-3">
+              <div className="flex items-start gap-2 min-w-0">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="break-words">{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={isLoading}
+                className="px-3 py-1.5 rounded-lg bg-rose-900/70 hover:bg-rose-800 text-rose-100 border border-rose-600/60 text-xs font-semibold shrink-0 cursor-pointer transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>Coba lagi</span>
+              </button>
             </div>
           )}
 

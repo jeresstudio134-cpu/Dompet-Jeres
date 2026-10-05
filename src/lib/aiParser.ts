@@ -1,9 +1,9 @@
 import { apiAiParse, AiParsedItem } from './api.ts';
 import { ParsedTransactionResult } from './autoParser.ts';
 
-const MAX_SIDE = 1200;
+const MAX_SIDE = 1600;
 
-// Kecilkan foto agar muat di batas upload server dan lebih cepat diproses AI
+// Kecilkan foto: sisi terpanjang maksimal 1600 px, JPEG kualitas 0.7 lewat canvas, targetkan di bawah 1 MB
 export const compressImage = (
   file: File
 ): Promise<{ base64: string; mimeType: string; preview: string }> =>
@@ -12,10 +12,21 @@ export const compressImage = (
     const img = new Image();
 
     img.onload = () => {
-      const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
+      let width = img.width;
+      let height = img.height;
+      if (width > MAX_SIDE || height > MAX_SIDE) {
+        if (width > height) {
+          height = Math.round((height * MAX_SIDE) / width);
+          width = MAX_SIDE;
+        } else {
+          width = Math.round((width * MAX_SIDE) / height);
+          height = MAX_SIDE;
+        }
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+      canvas.width = width;
+      canvas.height = height;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
@@ -24,10 +35,34 @@ export const compressImage = (
         return;
       }
 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // JPEG kualitas 0.7 lewat canvas, targetkan di bawah 1 MB
+      let quality = 0.7;
+      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+      const TARGET_BYTES = 1024 * 1024;
+      const getByteSize = (dataUri: string) => Math.round((dataUri.length - 23) * 0.75);
+
+      if (getByteSize(dataUrl) > TARGET_BYTES) {
+        quality = 0.55;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      }
+
+      if (getByteSize(dataUrl) > TARGET_BYTES) {
+        const smallerCanvas = document.createElement('canvas');
+        smallerCanvas.width = Math.round(width * 0.75);
+        smallerCanvas.height = Math.round(height * 0.75);
+        const sCtx = smallerCanvas.getContext('2d');
+        if (sCtx) {
+          sCtx.drawImage(canvas, 0, 0, smallerCanvas.width, smallerCanvas.height);
+          dataUrl = smallerCanvas.toDataURL('image/jpeg', 0.6);
+        }
+      }
+
       URL.revokeObjectURL(url);
-      resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', preview: dataUrl });
+      const base64 = dataUrl.split(',')[1] || '';
+      resolve({ base64, mimeType: 'image/jpeg', preview: dataUrl });
     };
 
     img.onerror = () => {
@@ -43,7 +78,7 @@ const toResults = (items: AiParsedItem[]): ParsedTransactionResult[] =>
     date: it.date,
     description: it.description,
     accountId: it.accountId,
-    type: it.type,
+    type: it.type === 'masuk' ? 'masuk' : 'keluar',
     category: it.category,
     amount: it.amount,
     transferTargetAccountId: it.transferToAccountId || undefined,
@@ -55,9 +90,21 @@ const toResults = (items: AiParsedItem[]): ParsedTransactionResult[] =>
 export const parseTextWithGemini = async (text: string): Promise<ParsedTransactionResult[]> =>
   toResults(await apiAiParse({ text }));
 
-// Foto struk -> daftar transaksi (base64 boleh dengan atau tanpa awalan "data:...")
+// Foto struk -> daftar transaksi (struk default type "keluar")
 export const parseReceiptWithGemini = async (
   base64: string,
   mimeType: string = 'image/jpeg'
-): Promise<ParsedTransactionResult[]> =>
-  toResults(await apiAiParse({ imageBase64: base64, mimeType }));
+): Promise<ParsedTransactionResult[]> => {
+  const items = await apiAiParse({ imageBase64: base64, mimeType });
+  return items.map(it => ({
+    date: it.date,
+    description: it.description,
+    accountId: it.accountId,
+    type: it.type === 'masuk' ? 'masuk' : 'keluar', // Struk default type keluar
+    category: it.category,
+    amount: it.amount,
+    transferTargetAccountId: it.transferToAccountId || undefined,
+    confidence: 0.95,
+    rawText: '',
+  }));
+};

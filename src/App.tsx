@@ -6,7 +6,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   INITIAL_ACCOUNTS, 
-  INITIAL_CATEGORIES 
+  INITIAL_CATEGORIES,
+  INITIAL_TRANSACTIONS
 } from './data/initialData.ts';
 import { 
   Transaction, 
@@ -413,13 +414,13 @@ export default function App() {
       let accs = data.accounts;
       if (accs.length === 0) {
         accs = INITIAL_ACCOUNTS;
-        await Promise.all(accs.map(a => apiSaveAccount(a)));
+        await Promise.all(accs.map(a => apiSaveAccount(a))).catch(() => {});
       }
 
       let cats = data.categories.filter(c => !isExcludedCategory(c));
       if (cats.length === 0) {
         cats = INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c));
-        await Promise.all(cats.map(c => apiAddCategory(c)));
+        await Promise.all(cats.map(c => apiAddCategory(c))).catch(() => {});
       }
 
       setAccounts(accs);
@@ -434,8 +435,11 @@ export default function App() {
         .then(setDebts)
         .catch(err => console.warn('Gagal memuat utang-piutang:', err));
     } catch (e: any) {
-      console.error(e);
-      if (!hasCache) setLoadError(e.message || 'Gagal memuat data dari database.');
+      console.warn('Gagal memuat data dari database/server, fallback ke penyimpanan lokal:', e);
+      setAccounts(INITIAL_ACCOUNTS);
+      setTransactions(INITIAL_TRANSACTIONS);
+      setCategories(INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c)));
+      setLoadError(null);
     } finally {
       clearTimeout(slowTimer);
       setLoadSlow(false);

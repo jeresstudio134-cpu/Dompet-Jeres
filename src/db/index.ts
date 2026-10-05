@@ -8,6 +8,10 @@ function createDb(url: string) {
 
 let instance: ReturnType<typeof createDb> | null = null;
 
+export function hasDatabaseUrl(): boolean {
+  return Boolean(process.env.DATABASE_URL || process.env.NEON_DATABASE_URL);
+}
+
 // Koneksi dibuat saat pertama dipakai, supaya error "DATABASE_URL kosong" muncul sebagai pesan API yang jelas
 export function getDb() {
   const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;

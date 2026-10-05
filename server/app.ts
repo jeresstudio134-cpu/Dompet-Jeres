@@ -9,21 +9,24 @@ export function createApp() {
   app.disable('x-powered-by');
   app.use(express.json({ limit: '6mb' })); // foto struk dikirim sebagai base64
 
-  // Tanpa CORS: aplikasi dan API berada di domain yang sama
-  app.use('/api', async (_req, _res, next) => {
-  if (process.env.SKIP_ENSURE_SCHEMA === '1') return next();
-  try {
-    await ensureSchema();
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
-  app.use('/api', adminContext);
-
   app.get('/api/warmup', (_req, res) => {
     res.json({ status: 'warm', timestamp: new Date().toISOString() });
   });
+
+  // Tanpa CORS: aplikasi dan API berada di domain yang sama
+  app.use('/api', async (_req, _res, next) => {
+    const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+    if (!url || process.env.SKIP_ENSURE_SCHEMA === '1') return next();
+    try {
+      await ensureSchema();
+      next();
+    } catch (err) {
+      console.warn('ensureSchema warning:', err);
+      next();
+    }
+  });
+
+  app.use('/api', adminContext);
 
   app.use('/api/transactions', transactionsRouter);
   app.use('/api', (_req, res) => {

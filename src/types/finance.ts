@@ -29,6 +29,7 @@ export interface Transaction {
   category: string;
   amount: number;
   notes?: string;
+  catatan?: string;
   transferTargetAccountId?: string;
   linkedTransactionId?: string;
   createdAt?: string;

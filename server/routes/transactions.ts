@@ -35,6 +35,7 @@ const toTx = (r: typeof transactions.$inferSelect) => ({
   category: r.category,
   amount: Number(r.amount) || 0,
   notes: r.notes ?? undefined,
+  catatan: r.notes ?? undefined,
   transferTargetAccountId: r.transferTargetAccountId ?? undefined,
   linkedTransactionId: r.linkedTransactionId ?? undefined,
   createdAt: r.createdAt ? r.createdAt.toISOString() : undefined,
@@ -56,6 +57,9 @@ function toRow(tx: any): typeof transactions.$inferInsert {
   if (!tx?.id || !description || !DATE_RE.test(date) || !tx?.type) {
     throw new HttpError(400, 'Missing required fields: id, description, date, type.');
   }
+  const rawNotes = tx?.catatan !== undefined ? tx.catatan : tx?.notes;
+  const notes = typeof rawNotes === 'string' && rawNotes.trim().length > 0 ? rawNotes.trim() : null;
+
   return {
     id: String(tx.id).slice(0, 64),
     no: tx.no ?? null,
@@ -65,7 +69,7 @@ function toRow(tx: any): typeof transactions.$inferInsert {
     type: tx.type === 'masuk' ? 'masuk' : 'keluar',
     category: typeof tx.category === 'string' ? tx.category.slice(0, 50) : 'Toko',
     amount: Math.round(Number(tx.amount)) || 0,
-    notes: tx.notes ?? null,
+    notes,
     transferTargetAccountId: tx.transferTargetAccountId ?? null,
     linkedTransactionId: tx.linkedTransactionId ?? null,
     createdAt: tx.createdAt ? new Date(tx.createdAt) : new Date(),
@@ -129,6 +133,14 @@ router.get(
   '/',
   asyncHandler(async (_req, res) => {
     res.set('Cache-Control', 'no-store, max-age=0');
+    const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+    if (!url) {
+      return res.json({
+        success: false,
+        databaseConnected: false,
+        error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
+      });
+    }
     const db = getDb();
     const [txRows, accRows, catRows, storeName, ownerName] = await Promise.all([
       db
@@ -155,7 +167,6 @@ router.get(
 // ---------- POST / PUT: semua jenis penyimpanan ----------
 const writeHandler = asyncHandler(async (req, res) => {
   const body = req.body ?? {};
-  const db = getDb();
 
   // Pencatatan otomatis dengan Gemini (terbuka untuk semua; non-admin dibatasi)
   if (body.entity === 'ai_parse') {
@@ -202,6 +213,17 @@ const writeHandler = asyncHandler(async (req, res) => {
 
     throw new HttpError(400, 'Aksi tidak dikenal.');
   }
+
+  const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+  if (!url) {
+    return res.json({
+      success: false,
+      databaseConnected: false,
+      error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
+    });
+  }
+
+  const db = getDb();
 
   // Pengaturan (hanya admin, hanya key yang diizinkan)
   if (body.entity === 'setting' && body.key) {
@@ -266,12 +288,39 @@ const writeHandler = asyncHandler(async (req, res) => {
 
 router.post('/', writeHandler);
 router.put('/', writeHandler);
+router.put(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    assertAdmin(req);
+    const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+    if (!url) {
+      return res.json({
+        success: false,
+        databaseConnected: false,
+        error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
+      });
+    }
+    const id = req.params.id;
+    const body = req.body ?? {};
+    const row = toRow({ ...body, id });
+    await upsertTransactions([row]);
+    return res.json({ success: true, id: row.id, transaction: toTx(row as any) });
+  })
+);
 
 // ---------- DELETE: semua hapus hanya untuk admin ----------
 router.delete(
   '/',
   asyncHandler(async (req, res) => {
     assertAdmin(req);
+    const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+    if (!url) {
+      return res.json({
+        success: false,
+        databaseConnected: false,
+        error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
+      });
+    }
     const db = getDb();
     const entity = queryString(req.query.entity);
     const id = queryString(req.query.id);

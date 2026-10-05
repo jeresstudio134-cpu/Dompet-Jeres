@@ -13,8 +13,8 @@ const LOCAL_OWNER_NAME_KEY = 'dompet_toko_owner_name';
 const LOCAL_PIN_KEY = 'dompet_toko_admin_pin';
 const LOCAL_DEBTS_KEY = 'dompet_pintar_debts';
 
-// Deteksi environment: apakah backend tersedia?
-// Di Vercel: backend tersedia. Di AI Studio / Vite dev: tidak tersedia.
+// Deteksi environment: apakah backend tersedia dan database terhubung?
+// Di Vercel (dengan DATABASE_URL): backend tersedia. Di AI Studio / offline: fallback ke local storage.
 let backendAvailable: boolean | null = null;
 
 async function checkBackend(): Promise<boolean> {
@@ -25,7 +25,16 @@ async function checkBackend(): Promise<boolean> {
       signal: AbortSignal.timeout(3000),
     });
     const ct = res.headers.get('content-type') || '';
-    backendAvailable = ct.includes('application/json');
+    if (!res.ok || !ct.includes('application/json')) {
+      backendAvailable = false;
+      return false;
+    }
+    const json = await res.json().catch(() => null);
+    if (!json || json.success === false || json.databaseConnected === false) {
+      backendAvailable = false;
+      return false;
+    }
+    backendAvailable = true;
   } catch {
     backendAvailable = false;
   }
@@ -193,6 +202,11 @@ async function safeRequest(url: string, options: RequestInit = {}): Promise<any 
   try {
     json = await res.json();
   } catch {
+    return null;
+  }
+
+  if (json?.databaseConnected === false || (json?.error && String(json.error).includes('DATABASE_URL'))) {
+    backendAvailable = false;
     return null;
   }
 
