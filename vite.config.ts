@@ -19,6 +19,9 @@ export default defineConfig(() => {
       exclude: ['@vercel/postgres', '@vercel/node'],
     },
     server: {
+      host: '0.0.0.0',
+      port: 3000,
+      allowedHosts: true,
       hmr: false,
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: ['**/api/**', '**/api-backup/**'],

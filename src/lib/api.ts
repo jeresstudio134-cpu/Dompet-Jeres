@@ -251,6 +251,7 @@ export const apiLoadAll = async (): Promise<{
   transactions: Transaction[];
   categories: string[];
   kantongList: string[];
+  kantongs: string[];
   storeName: string | null;
   ownerName: string | null;
 }> => {
@@ -275,11 +276,13 @@ export const apiLoadAll = async (): Promise<{
         if (serverStoreName) saveLocalStoreName(serverStoreName);
         if (serverOwnerName) saveLocalOwnerName(serverOwnerName);
 
+        const resolvedKantongs = serverKantongs.length > 0 ? serverKantongs : getLocalKantong();
         return {
           accounts: serverAccounts,
           transactions: serverTransactions,
           categories: serverCategories,
-          kantongList: serverKantongs.length > 0 ? serverKantongs : getLocalKantong(),
+          kantongList: resolvedKantongs,
+          kantongs: resolvedKantongs,
           storeName: serverStoreName,
           ownerName: serverOwnerName,
         };
@@ -290,11 +293,13 @@ export const apiLoadAll = async (): Promise<{
   }
 
   // Fallback: pakai localStorage (khusus dev/AI Studio)
+  const localKantongs = getLocalKantong();
   return {
     accounts: getLocalAccounts(),
     transactions: getLocalTransactions(),
     categories: getLocalCategories(),
-    kantongList: getLocalKantong(),
+    kantongList: localKantongs,
+    kantongs: localKantongs,
     storeName: getLocalStoreName(),
     ownerName: getLocalOwnerName(),
   };
@@ -539,11 +544,6 @@ export const apiAiParse = async (payload: {
   imageBase64?: string;
   mimeType?: string;
 }): Promise<AiParsedItem[]> => {
-  const hasBackend = await checkBackend();
-  if (!hasBackend) {
-    throw new Error('Fitur AI tidak tersedia di AI Studio. Silakan buka di Vercel.');
-  }
-
   const token = getAdminToken();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);

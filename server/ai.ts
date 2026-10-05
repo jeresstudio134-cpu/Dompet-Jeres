@@ -91,7 +91,7 @@ export interface AiInput {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function getModelCandidates(): string[] {
-  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
   const fallbackEnv = process.env.GEMINI_FALLBACK_MODELS?.trim() || 'gemini-2.5-flash-lite';
   const fallbacks = fallbackEnv
     .split(',')
