@@ -18,7 +18,7 @@ export function createApp() {
   // Tanpa CORS: aplikasi dan API berada di domain yang sama
   app.use('/api', async (_req, _res, next) => {
     const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
-    if (!url || process.env.SKIP_ENSURE_SCHEMA === '1') return next();
+    if (!url) return next();
     try {
       await ensureSchema();
       next();

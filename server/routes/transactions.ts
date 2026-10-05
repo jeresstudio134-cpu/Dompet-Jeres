@@ -13,6 +13,7 @@ import {
   signToken,
   verifyPin,
 } from '../auth.js';
+import { ensureSchema } from '../ensureSchema.js';
 import { asyncHandler, HttpError } from '../http.js';
 import { getSetting, setSetting } from '../settings.js';
 
@@ -144,18 +145,30 @@ router.get(
         error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
       });
     }
+    await ensureSchema();
     const db = getDb();
-    const [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await Promise.all([
-      db
-        .select()
-        .from(transactions)
-        .orderBy(desc(transactions.date), sql`${transactions.no} DESC NULLS LAST`, desc(transactions.id)),
-      db.select().from(accounts).orderBy(asc(accounts.id)),
-      db.select({ name: categories.name }).from(categories).orderBy(asc(categories.createdAt), asc(categories.name)),
-      db.select({ name: kantongs.name }).from(kantongs).orderBy(asc(kantongs.createdAt), asc(kantongs.name)),
-      getSetting('store_name'),
-      getSetting('owner_name'),
-    ]);
+
+    const loadAllFromDb = () =>
+      Promise.all([
+        db
+          .select()
+          .from(transactions)
+          .orderBy(desc(transactions.date), sql`${transactions.no} DESC NULLS LAST`, desc(transactions.id)),
+        db.select().from(accounts).orderBy(asc(accounts.id)),
+        db.select({ name: categories.name }).from(categories).orderBy(asc(categories.createdAt), asc(categories.name)),
+        db.select({ name: kantongs.name }).from(kantongs).orderBy(asc(kantongs.createdAt), asc(kantongs.name)),
+        getSetting('store_name'),
+        getSetting('owner_name'),
+      ]);
+
+    let txRows, accRows, catRows, kantongRows, storeName, ownerName;
+    try {
+      [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await loadAllFromDb();
+    } catch (err) {
+      console.warn('Query GET /api/transactions gagal, memperbaiki skema otomatis lalu mencoba ulang:', err);
+      await ensureSchema(true);
+      [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await loadAllFromDb();
+    }
 
     res.json({
       success: true,
@@ -228,6 +241,7 @@ const writeHandler = asyncHandler(async (req, res) => {
     });
   }
 
+  await ensureSchema();
   const db = getDb();
 
   // Pengaturan (hanya admin, hanya key yang diizinkan)
@@ -313,6 +327,7 @@ router.put(
         error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
       });
     }
+    await ensureSchema();
     const id = req.params.id;
     const body = req.body ?? {};
     const row = toRow({ ...body, id });
@@ -334,6 +349,7 @@ router.delete(
         error: 'DATABASE_URL belum diisi. Menggunakan mode penyimpanan lokal.',
       });
     }
+    await ensureSchema();
     const db = getDb();
     const entity = queryString(req.query.entity);
     const id = queryString(req.query.id);

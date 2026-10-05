@@ -80,12 +80,59 @@ export const initNeonTables = async (connectionString: string): Promise<{ succes
         account_id VARCHAR(50) REFERENCES accounts(id) ON DELETE SET NULL,
         type VARCHAR(10) NOT NULL,
         category VARCHAR(50) NOT NULL,
+        kantong VARCHAR(50),
         amount BIGINT NOT NULL,
         notes TEXT,
         transfer_target_account_id VARCHAR(50),
         linked_transaction_id VARCHAR(64),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    // Create categories, kantongs, settings tables
+    await sql`
+      CREATE TABLE IF NOT EXISTS categories (
+        name VARCHAR(50) PRIMARY KEY,
+        opening_balance BIGINT DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS kantongs (
+        name VARCHAR(50) PRIMARY KEY,
+        opening_balance BIGINT DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS settings (
+        key VARCHAR(50) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    // Ensure all columns exist on existing tables
+    await sql`
+      ALTER TABLE transactions
+        ADD COLUMN IF NOT EXISTS no INTEGER,
+        ADD COLUMN IF NOT EXISTS account_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT '',
+        ADD COLUMN IF NOT EXISTS kantong VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS notes TEXT,
+        ADD COLUMN IF NOT EXISTS transfer_target_account_id VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS linked_transaction_id VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `;
+    await sql`
+      ALTER TABLE categories
+        ADD COLUMN IF NOT EXISTS opening_balance BIGINT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `;
+    await sql`
+      ALTER TABLE kantongs
+        ADD COLUMN IF NOT EXISTS opening_balance BIGINT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `;
 
     // Create index on date and account for fast monthly filtering
@@ -98,7 +145,7 @@ export const initNeonTables = async (connectionString: string): Promise<{ succes
 
     return {
       success: true,
-      message: 'Tabel "accounts" dan "transactions" berhasil disiapkan di Neon PostgreSQL!',
+      message: 'Semua tabel ("accounts", "transactions", "categories", "kantongs", "settings") berhasil disiapkan di Neon PostgreSQL!',
     };
   } catch (err: any) {
     console.error('Neon init tables error:', err);
@@ -139,7 +186,7 @@ export const syncAllToNeon = async (
     for (const tx of transactions) {
       await sql`
         INSERT INTO transactions (
-          id, no, date, description, account_id, type, category, amount, notes, transfer_target_account_id, linked_transaction_id, created_at
+          id, no, date, description, account_id, type, category, kantong, amount, notes, transfer_target_account_id, linked_transaction_id, created_at
         ) VALUES (
           ${tx.id},
           ${tx.no ?? null},
@@ -148,6 +195,7 @@ export const syncAllToNeon = async (
           ${tx.accountId},
           ${tx.type},
           ${tx.category},
+          ${tx.kantong ?? null},
           ${tx.amount},
           ${tx.notes ?? null},
           ${tx.transferTargetAccountId ?? null},
@@ -161,6 +209,7 @@ export const syncAllToNeon = async (
           account_id = EXCLUDED.account_id,
           type = EXCLUDED.type,
           category = EXCLUDED.category,
+          kantong = EXCLUDED.kantong,
           amount = EXCLUDED.amount,
           notes = EXCLUDED.notes,
           transfer_target_account_id = EXCLUDED.transfer_target_account_id,
@@ -189,6 +238,7 @@ export const fetchAllFromNeon = async (
 ): Promise<{ success: boolean; accounts?: Account[]; transactions?: Transaction[]; message: string }> => {
   try {
     const sql = neon(connectionString.trim());
+    await initNeonTables(connectionString);
 
     // Fetch accounts
     const accRows = await sql`
@@ -205,6 +255,7 @@ export const fetchAllFromNeon = async (
         account_id as "accountId", 
         type, 
         category, 
+        kantong,
         amount, 
         notes, 
         transfer_target_account_id as "transferTargetAccountId", 
@@ -231,6 +282,7 @@ export const fetchAllFromNeon = async (
       accountId: r.accountId,
       type: r.type,
       category: r.category,
+      kantong: r.kantong || undefined,
       amount: Number(r.amount) || 0,
       notes: r.notes || undefined,
       transferTargetAccountId: r.transferTargetAccountId || undefined,
@@ -264,7 +316,7 @@ export const persistTransactionToDatabase = async (
       const sql = neon(connectionString.trim());
       await sql`
         INSERT INTO transactions (
-          id, no, date, description, account_id, type, category, amount, notes, transfer_target_account_id, linked_transaction_id, created_at
+          id, no, date, description, account_id, type, category, kantong, amount, notes, transfer_target_account_id, linked_transaction_id, created_at
         ) VALUES (
           ${tx.id},
           ${tx.no ?? null},
@@ -273,6 +325,7 @@ export const persistTransactionToDatabase = async (
           ${tx.accountId},
           ${tx.type},
           ${tx.category},
+          ${tx.kantong ?? null},
           ${tx.amount},
           ${tx.notes ?? null},
           ${tx.transferTargetAccountId ?? null},
@@ -286,6 +339,7 @@ export const persistTransactionToDatabase = async (
           account_id = EXCLUDED.account_id,
           type = EXCLUDED.type,
           category = EXCLUDED.category,
+          kantong = EXCLUDED.kantong,
           amount = EXCLUDED.amount,
           notes = EXCLUDED.notes,
           transfer_target_account_id = EXCLUDED.transfer_target_account_id,
