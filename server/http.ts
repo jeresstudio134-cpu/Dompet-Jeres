@@ -16,6 +16,8 @@ export const asyncHandler =
 
 export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
   const status = err instanceof HttpError ? err.status : 500;
-  if (status === 500) console.error(err);
-  res.status(status).json({ success: false, error: err?.message || 'Server error' });
+  const causeMsg = err?.cause?.message || '';
+  if (status === 500) console.error('Server error:', err, causeMsg);
+  const message = causeMsg ? `${err?.message || 'Server error'} (${causeMsg})` : err?.message || 'Server error';
+  res.status(status).json({ success: false, error: message });
 }

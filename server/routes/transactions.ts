@@ -26,30 +26,44 @@ const queryString = (v: unknown): string | undefined =>
   Array.isArray(v) ? String(v[0]) : typeof v === 'string' ? v : undefined;
 
 // ---------- Pemetaan data ----------
-const toTx = (r: typeof transactions.$inferSelect) => ({
+const toDateString = (d: any): string => {
+  if (!d) return new Date().toISOString().slice(0, 10);
+  if (typeof d === 'string') return d.slice(0, 10);
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  return String(d).slice(0, 10);
+};
+
+const toIsoString = (d: any): string | undefined => {
+  if (!d) return undefined;
+  if (d instanceof Date) return d.toISOString();
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? String(d) : parsed.toISOString();
+};
+
+const toTx = (r: any) => ({
   id: r.id,
   no: r.no ?? undefined,
-  date: r.date,
-  description: r.description,
-  accountId: r.accountId ?? '',
-  type: r.type,
-  category: r.category,
+  date: toDateString(r.date),
+  description: r.description ?? '',
+  accountId: r.accountId ?? r.account_id ?? '',
+  type: (r.type === 'masuk' ? 'masuk' : 'keluar') as 'masuk' | 'keluar',
+  category: r.category ?? '',
   kantong: r.kantong ?? undefined,
   amount: Number(r.amount) || 0,
   notes: r.notes ?? undefined,
   catatan: r.notes ?? undefined,
-  transferTargetAccountId: r.transferTargetAccountId ?? undefined,
-  linkedTransactionId: r.linkedTransactionId ?? undefined,
-  createdAt: r.createdAt ? r.createdAt.toISOString() : undefined,
+  transferTargetAccountId: r.transferTargetAccountId ?? r.transfer_target_account_id ?? undefined,
+  linkedTransactionId: r.linkedTransactionId ?? r.linked_transaction_id ?? undefined,
+  createdAt: toIsoString(r.createdAt ?? r.created_at),
 });
 
-const toAccount = (r: typeof accounts.$inferSelect) => ({
+const toAccount = (r: any) => ({
   id: r.id,
   name: r.name,
   type: r.type,
   color: r.color || '#0284c7',
-  iconName: r.iconName || 'Wallet',
-  initialBalance: Number(r.initialBalance) || 0,
+  iconName: r.iconName ?? r.icon_name ?? 'Wallet',
+  initialBalance: Number(r.initialBalance ?? r.initial_balance) || 0,
 });
 
 // Validasi + normalisasi satu transaksi dari body
@@ -161,19 +175,43 @@ router.get(
         getSetting('owner_name'),
       ]);
 
-    let txRows, accRows, catRows, kantongRows, storeName, ownerName;
+    let txRows: any[] = [];
+    let accRows: any[] = [];
+    let catRows: { name: string }[] = [];
+    let kantongRows: { name: string }[] = [];
+    let storeName: string | null = null;
+    let ownerName: string | null = null;
+
     try {
       [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await loadAllFromDb();
     } catch (err) {
-      console.warn('Query GET /api/transactions gagal, memperbaiki skema otomatis lalu mencoba ulang:', err);
+      console.warn('Query GET /api/transactions gagal, memperbaiki skema otomatis lalu mencoba fallback:', err);
       await ensureSchema(true);
-      [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await loadAllFromDb();
+      try {
+        [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await loadAllFromDb();
+      } catch (fallbackErr) {
+        console.warn('Menggunakan SELECT * fallback untuk kompatibilitas tabel Neon:', fallbackErr);
+        const [rawTx, rawAcc, rawCat, rawKt, sName, oName] = await Promise.all([
+          db.execute(sql`SELECT * FROM transactions ORDER BY date DESC, id DESC`).catch(() => ({ rows: [] })),
+          db.execute(sql`SELECT * FROM accounts ORDER BY id ASC`).catch(() => ({ rows: [] })),
+          db.execute(sql`SELECT name FROM categories ORDER BY name ASC`).catch(() => ({ rows: [] })),
+          db.execute(sql`SELECT name FROM kantongs ORDER BY name ASC`).catch(() => ({ rows: [] })),
+          getSetting('store_name'),
+          getSetting('owner_name'),
+        ]);
+        txRows = (rawTx as any).rows ?? (Array.isArray(rawTx) ? rawTx : []);
+        accRows = (rawAcc as any).rows ?? (Array.isArray(rawAcc) ? rawAcc : []);
+        catRows = (rawCat as any).rows ?? (Array.isArray(rawCat) ? rawCat : []);
+        kantongRows = (rawKt as any).rows ?? (Array.isArray(rawKt) ? rawKt : []);
+        storeName = sName;
+        ownerName = oName;
+      }
     }
 
     res.json({
       success: true,
-      categories: catRows.map(c => c.name),
-      kantongs: kantongRows.map(k => k.name),
+      categories: catRows.map((c: any) => c.name),
+      kantongs: kantongRows.map((k: any) => k.name),
       storeName,
       ownerName,
       transactions: txRows.map(toTx),
