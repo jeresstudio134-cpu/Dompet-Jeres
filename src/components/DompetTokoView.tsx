@@ -805,13 +805,15 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             <Database className="w-4 h-4" />
           </button>
 
-          <button
-            onClick={onOpenExportImport}
-            title="Ekspor ke Excel / Backup Data"
-            className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs transition cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+          {isAdmin && (
+            <button
+              onClick={onOpenExportImport}
+              title="Ekspor ke Excel / Backup Data"
+              className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs transition cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -855,7 +857,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   onFilterChange({ category: p.key });
                   setActiveTab('filter');
                 }}
-                className="text-left bg-white rounded-xl border border-slate-200/90 p-3 shadow-xs hover:border-[#1e3a5f]/40 transition cursor-pointer"
+                className="text-left bg-white rounded-xl border border-slate-200/90 p-3 shadow-xs hover:border-[#1e3a5f]/40 hover:shadow-sm active:scale-[0.96] active:bg-slate-100 active:border-[#1e3a5f] active:shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a5f]/40 transition duration-150 cursor-pointer select-none [-webkit-tap-highlight-color:transparent]"
               >
                 <div className="text-[11px] font-medium text-slate-500 leading-tight">{p.label}</div>
                 <div className={`text-sm font-bold tracking-tight mt-0.5 ${p.saldo < 0 ? 'text-rose-700' : 'text-slate-800'}`}>
@@ -1779,7 +1781,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div className={`grid grid-cols-1 gap-2 pt-1 ${isAdmin ? 'sm:grid-cols-2' : ''}`}>
               <button
                 type="button"
                 onClick={handlePrintFilter}
@@ -1789,14 +1791,16 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 <span>Cetak Hasil Filter</span>
               </button>
 
-              <button
-                type="button"
-                onClick={onOpenExportImport}
-                className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Ekspor ke Excel</span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={onOpenExportImport}
+                  className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Ekspor ke Excel</span>
+                </button>
+              )}
             </div>
 
           </div>
