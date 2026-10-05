@@ -9,6 +9,7 @@ const LOCAL_ACC_KEY = 'dompet_pintar_accounts';
 const LOCAL_TX_KEY = 'dompet_pintar_transactions';
 const LOCAL_CAT_KEY = 'dompet_pintar_categories';
 const LOCAL_STORE_NAME_KEY = 'dompet_toko_store_name';
+const LOCAL_OWNER_NAME_KEY = 'dompet_toko_owner_name';
 const LOCAL_PIN_KEY = 'dompet_toko_admin_pin';
 const LOCAL_DEBTS_KEY = 'dompet_pintar_debts';
 
@@ -116,12 +117,26 @@ function getLocalStoreName(): string {
     const stored = localStorage.getItem(LOCAL_STORE_NAME_KEY);
     if (stored && stored.trim()) return stored.trim();
   } catch {}
-  return 'JERES STUDIO';
+  return 'Dompet Keuangan';
 }
 
 function saveLocalStoreName(name: string) {
   try {
     localStorage.setItem(LOCAL_STORE_NAME_KEY, name.trim());
+  } catch {}
+}
+
+function getLocalOwnerName(): string {
+  try {
+    const stored = localStorage.getItem(LOCAL_OWNER_NAME_KEY);
+    if (stored && stored.trim()) return stored.trim();
+  } catch {}
+  return 'Mohammad Miftah';
+}
+
+function saveLocalOwnerName(name: string) {
+  try {
+    localStorage.setItem(LOCAL_OWNER_NAME_KEY, name.trim());
   } catch {}
 }
 
@@ -204,6 +219,7 @@ export const apiLoadAll = async (): Promise<{
   transactions: Transaction[];
   categories: string[];
   storeName: string | null;
+  ownerName: string | null;
 }> => {
   const hasBackend = await checkBackend();
 
@@ -215,18 +231,21 @@ export const apiLoadAll = async (): Promise<{
         const serverTransactions = (json.transactions || []) as Transaction[];
         const serverCategories = (json.categories || []) as string[];
         const serverStoreName = (json.storeName ?? null) as string | null;
+        const serverOwnerName = (json.ownerName ?? null) as string | null;
 
         // Simpan cache untuk baca cepat
         if (serverAccounts.length > 0) saveLocalAccounts(serverAccounts);
         if (serverTransactions.length > 0) saveLocalTransactions(serverTransactions);
         if (serverCategories.length > 0) saveLocalCategories(serverCategories);
         if (serverStoreName) saveLocalStoreName(serverStoreName);
+        if (serverOwnerName) saveLocalOwnerName(serverOwnerName);
 
         return {
           accounts: serverAccounts,
           transactions: serverTransactions,
           categories: serverCategories,
           storeName: serverStoreName,
+          ownerName: serverOwnerName,
         };
       }
     } catch (err) {
@@ -240,6 +259,7 @@ export const apiLoadAll = async (): Promise<{
     transactions: getLocalTransactions(),
     categories: getLocalCategories(),
     storeName: getLocalStoreName(),
+    ownerName: getLocalOwnerName(),
   };
 };
 
@@ -358,6 +378,7 @@ export const apiDeleteCategory = async (name: string): Promise<void> => {
 
 export const apiSaveSetting = async (key: string, value: string): Promise<void> => {
   if (key === 'store_name') saveLocalStoreName(value);
+  if (key === 'owner_name') saveLocalOwnerName(value);
 
   const hasBackend = await checkBackend();
   if (hasBackend) {

@@ -56,13 +56,14 @@ export default function App() {
   // 1. Core State
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [storeName, setStoreName] = useState<string>('Dompet');
+  const [storeName, setStoreName] = useState<string>('Dompet Keuangan');
+  const [ownerName, setOwnerName] = useState<string>('Mohammad Miftah');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadSlow, setLoadSlow] = useState<boolean>(false);
 
   const handleUpdateStoreName = async (newName: string): Promise<boolean> => {
-    const trimmed = newName.trim() || 'Dompet Toko';
+    const trimmed = newName.trim() || 'Dompet Keuangan';
     try {
       await apiSaveSetting('store_name', trimmed);
       setStoreName(trimmed);
@@ -71,6 +72,20 @@ export default function App() {
     } catch (e) {
       console.error(e);
       showToast('Gagal menyimpan nama toko. Periksa koneksi lalu coba lagi.', 'error');
+      return false;
+    }
+  };
+
+  const handleUpdateOwnerName = async (newName: string): Promise<boolean> => {
+    const trimmed = newName.trim() || 'Mohammad Miftah';
+    try {
+      await apiSaveSetting('owner_name', trimmed);
+      setOwnerName(trimmed);
+      showToast(`Nama pemilik berhasil diubah menjadi "${trimmed}"!`, 'success');
+      return true;
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal menyimpan nama pemilik. Periksa koneksi lalu coba lagi.', 'error');
       return false;
     }
   };
@@ -380,6 +395,7 @@ export default function App() {
           setTransactions(c.transactions);
           setCategories(Array.isArray(c.categories) ? c.categories : []);
           if (c.storeName) setStoreName(c.storeName);
+          if (c.ownerName) setOwnerName(c.ownerName);
           hasCache = true;
           setIsLoading(false);
         }
@@ -410,6 +426,7 @@ export default function App() {
       setTransactions(data.transactions);
       setCategories(cats);
       if (data.storeName && data.storeName.trim()) setStoreName(data.storeName.trim());
+      if (data.ownerName && data.ownerName.trim()) setOwnerName(data.ownerName.trim());
       setIsLoading(false);
 
       // Utang-piutang dimuat di belakang, tidak menahan layar utama
@@ -432,12 +449,12 @@ export default function App() {
     try {
       localStorage.setItem(
         CACHE_KEY,
-        JSON.stringify({ accounts, transactions, categories, storeName })
+        JSON.stringify({ accounts, transactions, categories, storeName, ownerName })
       );
     } catch {
       /* penyimpanan penuh, abaikan */
     }
-  }, [accounts, transactions, categories, storeName, isLoading]);
+  }, [accounts, transactions, categories, storeName, ownerName, isLoading]);
 
   useEffect(() => {
     loadAll();
@@ -809,6 +826,8 @@ export default function App() {
             debts={debts}
             accounts={accounts}
             isAdmin={isAdmin}
+            storeName={storeName}
+            ownerName={ownerName}
             onAddDebt={handleAddDebt}
             onUpdateDebt={handleUpdateDebt}
             onDeleteDebt={handleDeleteDebt}
@@ -824,6 +843,8 @@ export default function App() {
             debts={debts}
             categories={categories}
             isAdmin={isAdmin}
+            storeName={storeName}
+            ownerName={ownerName}
             onOpenAdminModal={() => setIsAdminModalOpen(true)}
             onRefreshData={loadAll}
           />
@@ -939,6 +960,8 @@ export default function App() {
         onLogoutAdmin={handleLogoutAdmin}
         storeName={storeName}
         onUpdateStoreName={handleUpdateStoreName}
+        ownerName={ownerName}
+        onUpdateOwnerName={handleUpdateOwnerName}
         accounts={accounts}
         transactions={transactions}
         onAddAccount={handleAddAccount}

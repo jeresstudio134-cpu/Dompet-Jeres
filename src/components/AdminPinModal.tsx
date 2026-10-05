@@ -17,7 +17,8 @@ import {
   Landmark,
   Banknote,
   Smartphone,
-  Store
+  Store,
+  User
 } from 'lucide-react';
 import { Account, Transaction } from '../types/finance.ts';
 import { parseRupiahInput, formatRupiah } from '../utils/formatters.ts';
@@ -57,6 +58,8 @@ interface AdminPinModalProps {
   onDeleteAccount: (id: string) => void;
   storeName?: string;
   onUpdateStoreName?: (name: string) => Promise<boolean> | void;
+  ownerName?: string;
+  onUpdateOwnerName?: (name: string) => Promise<boolean>;
 }
 
 export const AdminPinModal: React.FC<AdminPinModalProps> = ({
@@ -72,6 +75,8 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
   onDeleteAccount,
   storeName,
   onUpdateStoreName,
+  ownerName,
+  onUpdateOwnerName,
 }) => {
   const [pinInput, setPinInput] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -83,8 +88,17 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
   // Mode: 'login' | 'menu' | 'change_pin' | 'manage_accounts' | 'change_store_name'
   const [activeView, setActiveView] = useState<'login' | 'menu' | 'change_pin' | 'manage_accounts' | 'change_store_name'>('menu');
   
-  // State for changing store name
-  const [storeNameInput, setStoreNameInput] = useState(storeName || 'Dompet Toko');
+  // State for changing store name & owner name
+  const [storeNameInput, setStoreNameInput] = useState(storeName || 'Dompet Keuangan');
+  const [ownerNameInput, setOwnerNameInput] = useState(ownerName || 'Mohammad Miftah');
+
+  useEffect(() => {
+    if (storeName) setStoreNameInput(storeName);
+  }, [storeName]);
+
+  useEffect(() => {
+    if (ownerName) setOwnerNameInput(ownerName);
+  }, [ownerName]);
 
   // State for changing PIN
   const [currentPinInput, setCurrentPinInput] = useState('');
@@ -644,23 +658,53 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                   </div>
                 </form>
               ) : activeView === 'change_store_name' ? (
-                /* VIEW: CHANGE STORE NAME */
+                /* VIEW: CHANGE STORE & OWNER NAME */
                 <form 
                   onSubmit={async (e) => {
                     e.preventDefault();
                     setErrorMessage('');
-                    if (!storeNameInput.trim()) {
+                    const trimmedStore = storeNameInput.trim();
+                    const trimmedOwner = ownerNameInput.trim();
+
+                    if (!trimmedStore) {
                       setErrorMessage('Nama toko tidak boleh kosong.');
                       return;
                     }
-                    if (onUpdateStoreName) {
-                      const ok = await onUpdateStoreName(storeNameInput.trim());
-                      if (ok === false) {
-                        setErrorMessage('Gagal menyimpan nama toko. Pastikan mode admin masih aktif dan koneksi baik.');
-                        return;
-                      }
+                    if (!trimmedOwner) {
+                      setErrorMessage('Nama pemilik tidak boleh kosong.');
+                      return;
                     }
-                    setSuccessMessage('Nama toko berhasil diperbarui!');
+
+                    const currentStore = (storeName || '').trim();
+                    const currentOwner = (ownerName || '').trim();
+                    const storeChanged = trimmedStore !== currentStore;
+                    const ownerChanged = trimmedOwner !== currentOwner;
+
+                    // Jika tidak ada perubahan, langsung kembali ke menu
+                    if (!storeChanged && !ownerChanged) {
+                      setActiveView('menu');
+                      return;
+                    }
+
+                    let okStore = true;
+                    let okOwner = true;
+
+                    if (storeChanged && onUpdateStoreName) {
+                      const res = await onUpdateStoreName(trimmedStore);
+                      if (res === false) okStore = false;
+                    }
+
+                    if (ownerChanged && onUpdateOwnerName) {
+                      const res = await onUpdateOwnerName(trimmedOwner);
+                      if (res === false) okOwner = false;
+                    }
+
+                    if (!okStore || !okOwner) {
+                      setErrorMessage('Gagal menyimpan perubahan. Pastikan mode admin masih aktif dan koneksi baik.');
+                      return;
+                    }
+
+                    setSuccessMessage('Nama toko & pemilik berhasil diperbarui!');
                     setTimeout(() => {
                       setActiveView('menu');
                       setSuccessMessage('');
@@ -685,12 +729,12 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 
                   <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <Store className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Ubah Nama Toko / Usaha</span>
+                    <span>Ubah Nama Toko & Pemilik</span>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                      Nama Toko Baru:
+                      Nama Toko:
                     </label>
                     <input
                       type="text"
@@ -702,7 +746,24 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                       required
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
-                      Nama ini akan ditampilkan pada judul utama dan laporan.
+                      Ditampilkan pada judul utama dan kop laporan.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                      Nama Pemilik:
+                    </label>
+                    <input
+                      type="text"
+                      value={ownerNameInput}
+                      onChange={(e) => setOwnerNameInput(e.target.value)}
+                      placeholder="Contoh: Mohammad Miftah"
+                      className="w-full bg-white text-slate-800 text-xs rounded-xl px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Ditampilkan pada bagian tanda tangan laporan.
                     </p>
                   </div>
 
@@ -725,7 +786,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                       type="submit"
                       className="flex-1 py-2 rounded-xl bg-[#1e3a5f] hover:bg-[#152942] text-white font-bold text-xs transition cursor-pointer"
                     >
-                      Simpan Nama Toko
+                      Simpan
                     </button>
                     <button
                       type="button"
@@ -777,12 +838,13 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                       </span>
                     </button>
 
-                    {/* 2. Ubah Nama Toko */}
+                    {/* 2. Ubah Nama Toko & Pemilik */}
                     <button
                       type="button"
                       onClick={() => {
                         setActiveView('change_store_name');
-                        setStoreNameInput(storeName || 'Dompet Toko');
+                        setStoreNameInput(storeName || 'Dompet Keuangan');
+                        setOwnerNameInput(ownerName || 'Mohammad Miftah');
                         setErrorMessage('');
                         setSuccessMessage('');
                       }}
@@ -793,12 +855,12 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                           <Store className="w-4 h-4" />
                         </div>
                         <div className="text-left">
-                          <h4 className="font-bold text-slate-800 text-xs">Ubah Nama Toko</h4>
-                          <p className="text-[10px] text-slate-500">Ganti nama toko / nama pembukuan Anda</p>
+                          <h4 className="font-bold text-slate-800 text-xs">Ubah Nama Toko & Pemilik</h4>
+                          <p className="text-[10px] text-slate-500">Nama toko dan nama pemilik pada judul dan laporan</p>
                         </div>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 max-w-[120px] truncate">
-                        {storeName || 'Dompet Toko'}
+                        {storeName || 'Dompet Keuangan'}
                       </span>
                     </button>
 

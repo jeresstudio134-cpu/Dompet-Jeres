@@ -35,6 +35,7 @@ interface UtangPiutangViewProps {
   onOpenAutoDebt?: () => void;
   onOpenAdminModal?: () => void;
   storeName?: string;
+  ownerName?: string;
 }
 
 
@@ -50,6 +51,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   onDeletePayment,
   onOpenAdminModal,
   storeName,
+  ownerName,
 }) => {
   const [activeTab, setActiveTab] = useState<DebtType>('utang');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -224,7 +226,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
         second: '2-digit',
       });
 
-    const storeTitle = storeName?.trim() || 'Dompet Toko';
+    const storeTitle = storeName?.trim() || 'Dompet Keuangan';
     const isPiutang = type === 'piutang';
     const typeLabel = isPiutang ? 'Piutang Saya' : 'Utang Saya';
     const paidLabel = isPiutang ? 'Sudah Diterima' : 'Sudah Dibayar';
@@ -471,7 +473,8 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
         second: '2-digit',
       });
 
-    const storeTitle = storeName?.trim() || 'Dompet Toko';
+    const storeTitle = storeName?.trim() || 'Dompet Keuangan';
+    const ownerTitle = ownerName?.trim() || storeTitle;
     const isPiutang = debt.type === 'piutang';
     const typeLabel = isPiutang ? 'Piutang' : 'Utang';
     const paid = getTotalPaid(debt);
@@ -674,7 +677,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
       </td>
       <td style="width: 50%; text-align: center; vertical-align: top;">
         <div style="font-size: 10px; color: #555;">Pihak Pengelola:</div>
-        <div style="font-weight: bold; margin-top: 2px;">${escapeHtml(storeTitle)}</div>
+        <div style="font-weight: bold; margin-top: 2px;">${escapeHtml(ownerTitle)}</div>
         <div style="height: 50px;"></div>
         <div style="border-top: 1px dashed #666; width: 60%; margin: 0 auto; padding-top: 3px; font-size: 9px; color: #666;">
           (Tanda Tangan / Cap Toko)
@@ -1341,7 +1344,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Catatan: pembayaran di sini <b>tidak otomatis</b> mengurangi saldo akun. Catat transaksi "Keluar" di Dompet Toko jika ingin mempengaruhi saldo.
+                  Catatan: pembayaran di sini <b>tidak otomatis</b> mengurangi saldo akun. Catat transaksi "Keluar" di {storeName || 'Dompet Keuangan'} jika ingin mempengaruhi saldo.
                 </p>
               </div>
 

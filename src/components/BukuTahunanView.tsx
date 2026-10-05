@@ -34,6 +34,8 @@ interface BukuTahunanViewProps {
   debts: Debt[];
   categories: string[];
   isAdmin: boolean;
+  storeName?: string;
+  ownerName?: string;
   onOpenAdminModal: () => void;
   onRefreshData: () => Promise<void> | void;
 }
@@ -54,6 +56,8 @@ export const BukuTahunanView: React.FC<BukuTahunanViewProps> = ({
   debts: liveDebts,
   categories: liveCategories,
   isAdmin,
+  storeName,
+  ownerName,
   onOpenAdminModal,
   onRefreshData,
 }) => {

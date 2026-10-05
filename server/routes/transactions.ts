@@ -18,7 +18,7 @@ import { getSetting, setSetting } from '../settings.js';
 
 const router = Router();
 
-const PUBLIC_SETTINGS = ['store_name']; // hanya key ini yang boleh ditulis lewat entity "setting"
+const PUBLIC_SETTINGS = ['store_name', 'owner_name']; // hanya key ini yang boleh ditulis lewat entity "setting"
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const queryString = (v: unknown): string | undefined =>
@@ -130,7 +130,7 @@ router.get(
   asyncHandler(async (_req, res) => {
     res.set('Cache-Control', 'no-store, max-age=0');
     const db = getDb();
-    const [txRows, accRows, catRows, storeName] = await Promise.all([
+    const [txRows, accRows, catRows, storeName, ownerName] = await Promise.all([
       db
         .select()
         .from(transactions)
@@ -138,12 +138,14 @@ router.get(
       db.select().from(accounts).orderBy(asc(accounts.id)),
       db.select({ name: categories.name }).from(categories).orderBy(asc(categories.createdAt), asc(categories.name)),
       getSetting('store_name'),
+      getSetting('owner_name'),
     ]);
 
     res.json({
       success: true,
       categories: catRows.map(c => c.name),
       storeName,
+      ownerName,
       transactions: txRows.map(toTx),
       accounts: accRows.map(toAccount),
     });
