@@ -262,6 +262,27 @@ export default function App() {
     }
   };
 
+  // Handler: Edit pembayaran/angsuran
+  const handleUpdateDebtPayment = async (
+    debtId: string,
+    payment: DebtPayment
+  ) => {
+    try {
+      await apiSaveDebtPayment(payment);
+      setDebts(prev =>
+        prev.map(d =>
+          d.id === debtId
+            ? { ...d, payments: d.payments.map(p => (p.id === payment.id ? payment : p)) }
+            : d
+        )
+      );
+      showToast(`Pembayaran ${formatRupiah(payment.amount)} berhasil diperbarui!`);
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memperbarui pembayaran. Coba lagi.', 'error');
+    }
+  };
+
   // Handler: Hapus pembayaran
   const handleDeleteDebtPayment = async (debtId: string, paymentId: string) => {
     try {
@@ -990,6 +1011,7 @@ export default function App() {
             onUpdateDebt={handleUpdateDebt}
             onDeleteDebt={handleDeleteDebt}
             onAddPayment={handleAddDebtPayment}
+            onUpdatePayment={handleUpdateDebtPayment}
             onDeletePayment={handleDeleteDebtPayment}
           />
         )}

@@ -31,6 +31,7 @@ interface UtangPiutangViewProps {
   onUpdateDebt: (debt: Debt) => void | Promise<void>;
   onDeleteDebt: (id: string) => void | Promise<void>;
   onAddPayment: (debtId: string, payment: Omit<DebtPayment, 'id' | 'debtId'>) => void | Promise<void>;
+  onUpdatePayment?: (debtId: string, payment: DebtPayment) => void | Promise<void>;
   onDeletePayment: (debtId: string, paymentId: string) => void | Promise<void>;
   onOpenAutoDebt?: () => void;
   onOpenAdminModal?: () => void;
@@ -48,6 +49,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   onUpdateDebt,
   onDeleteDebt,
   onAddPayment,
+  onUpdatePayment,
   onDeletePayment,
   onOpenAdminModal,
   storeName,
@@ -58,6 +60,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
   const [payingDebt, setPayingDebt] = useState<Debt | null>(null);
+  const [editingPayment, setEditingPayment] = useState<DebtPayment | null>(null);
   const [autoDebtOpen, setAutoDebtOpen] = useState(false);
 
   // Form state
@@ -135,27 +138,47 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   };
 
   const handleOpenPay = (debt: Debt) => {
+    setEditingPayment(null);
     setPayDate(getCurrentDateIndo());
-    const sisa = getSisa(debt);
     setPayAmount('');
     setPayAccount(accounts[0]?.id || '');
     setPayNotes('');
     setPayingDebt(debt);
   };
 
-    const handleSubmitPayment = async (e: React.FormEvent) => {
+  const handleOpenEditPayment = (debt: Debt, payment: DebtPayment) => {
+    setEditingPayment(payment);
+    setPayDate(payment.date);
+    setPayAmount(payment.amount ? payment.amount.toLocaleString('id-ID') : '');
+    setPayAccount(payment.accountId || '');
+    setPayNotes(payment.notes || '');
+    setPayingDebt(debt);
+  };
+
+  const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingDebt) return;
     const amount = parseRupiahInput(payAmount);
     if (amount <= 0) return;
 
-    await onAddPayment(payingDebt.id, {
-      date: payDate,
-      amount,
-      accountId: payAccount || undefined,
-      notes: payNotes.trim() || undefined,
-    });
+    if (editingPayment && onUpdatePayment) {
+      await onUpdatePayment(payingDebt.id, {
+        ...editingPayment,
+        date: payDate,
+        amount,
+        accountId: payAccount || undefined,
+        notes: payNotes.trim() || undefined,
+      });
+    } else {
+      await onAddPayment(payingDebt.id, {
+        date: payDate,
+        amount,
+        accountId: payAccount || undefined,
+        notes: payNotes.trim() || undefined,
+      });
+    }
 
+    setEditingPayment(null);
     setPayingDebt(null);
   };
 
@@ -845,12 +868,12 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                   lunas ? 'border-emerald-200' : 'border-slate-200/90'
                 }`}
               >
-                {/* Header Card */}
+                {/* Header & Isi Kartu Utang/Piutang (Sesuai Form Isian) */}
                 <div className="p-3.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-sm text-slate-800 truncate">
+                        <span className="font-bold text-sm text-slate-800 break-words">
                           {debt.name}
                         </span>
                         {lunas ? (
@@ -875,17 +898,26 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                           </span>
                         )}
                       </div>
-                      {debt.counterparty && (
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Kepada: <span className="font-medium text-slate-700">{debt.counterparty}</span>
+
+                      {/* Baris Kepada/Dari & Catatan sesuai Form Isian */}
+                      <div className="mt-1 space-y-0.5 text-[11px] text-slate-500">
+                        <div>
+                          {debt.type === 'utang' ? 'Kepada' : 'Dari'}:{' '}
+                          <span className="font-semibold text-slate-700">
+                            {debt.counterparty?.trim() || '—'}
+                          </span>
                         </div>
-                      )}
-                      {debt.notes && (
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Catatan: <span className="font-medium text-slate-700">{debt.notes}</span>
-                        </div>
-                      )}
+                        {debt.notes && (
+                          <div>
+                            Catatan:{' '}
+                            <span className="font-medium text-slate-700">
+                              {debt.notes}
+                            </span>
+                          </div>
+                        )}
                       </div>
+                    </div>
+
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         type="button"
@@ -926,7 +958,9 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                   <div className="mt-2.5">
                     <div className="flex items-center justify-between text-[11px] mb-1">
                       <span className="text-slate-500">
-                        Dibayar <b className="text-slate-700">{formatRupiah(paid)}</b> dari <b className="text-slate-700">{formatRupiah(debt.totalAmount)}</b>
+                        {debt.type === 'utang' ? 'Sudah Dibayar' : 'Sudah Diterima'}{' '}
+                        <b className="text-emerald-700">{formatRupiah(paid)}</b> dari{' '}
+                        <b className="text-slate-800">{formatRupiah(debt.totalAmount)}</b>
                       </span>
                       <span className="font-bold text-slate-700">{progress.toFixed(0)}%</span>
                     </div>
@@ -940,33 +974,68 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Sisa + Info */}
-                  <div className="mt-2.5 grid grid-cols-2 gap-2">
-                    <div className="bg-slate-50 rounded-lg px-2.5 py-1.5">
+                  {/* Kotak Ringkasan Nominal (Sesuai Form Bayar/Angsur: Total Pokok, Sudah Dibayar, Sisa) */}
+                  <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+                    <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                      <div className="text-[10px] text-slate-500 font-medium">Total Pokok</div>
+                      <div className="text-xs font-bold font-mono text-slate-800 truncate">
+                        {formatRupiah(debt.totalAmount)}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        {debt.type === 'utang' ? 'Sudah Dibayar' : 'Sudah Diterima'}
+                      </div>
+                      <div className="text-xs font-bold font-mono text-emerald-700 truncate">
+                        {formatRupiah(paid)}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100">
                       <div className="text-[10px] text-slate-500 font-medium">Sisa</div>
-                      <div className={`text-xs font-bold ${lunas ? 'text-emerald-700' : activeTab === 'utang' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                      <div className={`text-xs font-bold font-mono truncate ${lunas ? 'text-emerald-700' : activeTab === 'utang' ? 'text-rose-700' : 'text-emerald-700'}`}>
                         {formatRupiah(sisa)}
                       </div>
                     </div>
-                    <div className="bg-slate-50 rounded-lg px-2.5 py-1.5">
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        {debt.installmentAmount ? 'Cicilan / bulan' : 'Jatuh tempo'}
+                  </div>
+
+                  {/* Baris Tanggal Mulai & Jatuh Tempo (2 Kolom Sesuai Form Isian) */}
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    <div className="bg-slate-50/80 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                      <div className="text-[10px] text-slate-500 font-medium">Tanggal Mulai</div>
+                      <div className="text-[11px] font-bold text-slate-700 truncate">
+                        {debt.startDate ? formatTanggalIndo(debt.startDate, true) : '—'}
                       </div>
-                      <div className="text-xs font-bold text-slate-700 truncate">
-                        {debt.installmentAmount
-                          ? formatRupiah(debt.installmentAmount)
-                          : debt.dueDate
-                            ? formatTanggalIndo(debt.dueDate, true)
-                            : '—'}
+                    </div>
+                    <div className="bg-slate-50/80 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                      <div className="text-[10px] text-slate-500 font-medium">Jatuh Tempo</div>
+                      <div className="text-[11px] font-bold text-slate-700 truncate">
+                        {debt.dueDate ? formatTanggalIndo(debt.dueDate, true) : '—'}
                       </div>
                     </div>
                   </div>
+
+                  {/* Baris Cicilan / Bulan & Jumlah Cicilan (Jika diisi pada Form Isian) */}
+                  {(debt.installmentAmount || debt.installmentPeriod) && (
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                      <div className="bg-slate-50/80 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                        <div className="text-[10px] text-slate-500 font-medium">Cicilan / Bulan</div>
+                        <div className="text-[11px] font-bold font-mono text-slate-700 truncate">
+                          {debt.installmentAmount ? formatRupiah(debt.installmentAmount) : '—'}
+                        </div>
+                      </div>
+                      <div className="bg-slate-50/80 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                        <div className="text-[10px] text-slate-500 font-medium">Jumlah Cicilan</div>
+                        <div className="text-[11px] font-bold text-slate-700 truncate">
+                          {debt.installmentPeriod ? `${debt.installmentPeriod}x` : '—'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Action Buttons */}
                   <div className="mt-2.5 flex items-center gap-1.5">
                     {!lunas && (
                       isAdmin ? (
-                        // Mode Admin: tombol aktif
                         <button
                           type="button"
                           onClick={() => handleOpenPay(debt)}
@@ -976,7 +1045,6 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                           Bayar / Angsur
                         </button>
                       ) : (
-                        // Mode Kasir: tombol terkunci (disabled, tanpa popup alert)
                         <button
                           type="button"
                           disabled
@@ -995,13 +1063,12 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                       {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                       Riwayat ({debt.payments.length})
                     </button>
-
                   </div>
                 </div>
 
-                {/* Riwayat Pembayaran (Expand) */}
+                {/* Riwayat Pembayaran (Sesuai Kolom Form Isian Bayar / Angsur) */}
                 {expanded && (
-                  <div className="border-t border-slate-100 bg-slate-50/50 px-3.5 py-2.5 space-y-1.5 animate-in fade-in">
+                  <div className="border-t border-slate-100 bg-slate-50/50 px-3.5 py-2.5 space-y-2 animate-in fade-in">
                     {debt.payments.length === 0 ? (
                       <div className="text-center text-[11px] text-slate-400 py-2">
                         Belum ada pembayaran.
@@ -1010,40 +1077,58 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                       [...debt.payments]
                         .sort((a, b) => (a.date < b.date ? 1 : -1))
                         .map((p, idx) => {
+                          const angsuranNo = debt.payments.length - idx;
                           const accName = accounts.find(a => a.id === p.accountId)?.name;
+                          const noteText = p.notes?.trim() || '';
+
                           return (
                             <div
                               key={p.id}
-                              className="bg-white rounded-lg border border-slate-200 px-2.5 py-1.5 flex items-start justify-between gap-2"
+                              className="bg-white rounded-xl border border-slate-200/90 px-3 py-2 flex items-start justify-between gap-2.5 hover:bg-slate-50/60 transition"
                             >
                               <div className="min-w-0 flex-1">
-                                <div className="text-[11px] font-bold text-slate-800">
-                                  Angsuran #{debt.payments.length - idx}
+                                {/* Baris 1: Judul / Catatan Angsuran & Jumlah Bayar (Rp) */}
+                                <div className="text-xs font-semibold text-slate-900 break-words leading-snug flex items-center flex-wrap gap-1.5">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
+                                    #{angsuranNo}
+                                  </span>
+                                  <span>{noteText || `Angsuran ke-${angsuranNo}`}</span>
+                                  <span className="text-slate-400 font-normal mx-0.5 select-none">—</span>
+                                  <span className="font-bold font-mono text-xs text-emerald-700">
+                                    {formatRupiah(p.amount)}
+                                  </span>
                                 </div>
-                                <div className="text-[10px] text-slate-500 flex flex-wrap items-center gap-x-1.5">
+
+                                {/* Baris 2: Kolom sesuai Form Bayar/Angsur (Tanggal Bayar • Bayar dari Akun • Catatan) */}
+                                <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed">
                                   <span>{formatTanggalIndo(p.date, true)}</span>
-                                  {accName && (
+                                  <span>•</span>
+                                  <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                                    <Wallet className="w-3 h-3 text-slate-400" />
+                                    {accName || 'Tanpa Akun'}
+                                  </span>
+                                  {noteText && (
                                     <>
                                       <span>•</span>
-                                      <span className="inline-flex items-center gap-0.5">
-                                        <Wallet className="w-2.5 h-2.5" />
-                                        {accName}
+                                      <span className="italic text-slate-500 break-words">
+                                        "{noteText}"
                                       </span>
-                                    </>
-                                  )}
-                                  {p.notes && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="italic">{p.notes}</span>
                                     </>
                                   )}
                                 </div>
                               </div>
-                              <div className="text-right shrink-0">
-                                <div className="text-[11px] font-bold font-mono text-emerald-700">
-                                  {formatRupiah(p.amount)}
-                                </div>
-                                {isAdmin && (
+
+                              {/* Tombol Edit & Hapus Angsuran (Admin) */}
+                              {isAdmin && (
+                                <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditPayment(debt, p)}
+                                    title="Edit pembayaran ini (Admin)"
+                                    className="p-1 text-slate-400 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-md transition cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={async () => {
@@ -1051,12 +1136,13 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                                         await onDeletePayment(debt.id, p.id);
                                       }
                                     }}
-                                    className="text-[10px] text-rose-500 hover:text-rose-700 hover:underline cursor-pointer"
+                                    title="Hapus pembayaran ini (Admin)"
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
                                   >
-                                    Hapus
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })
@@ -1250,7 +1336,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-800 text-sm">
-                    Bayar / Angsur
+                    {editingPayment ? 'Edit Pembayaran / Angsuran' : 'Bayar / Angsur'}
                   </h3>
                   <p className="text-[10px] text-slate-500 truncate">
                     {payingDebt.name}
@@ -1259,7 +1345,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setPayingDebt(null)}
+                onClick={() => { setPayingDebt(null); setEditingPayment(null); }}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1370,11 +1456,11 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                   type="submit"
                   className="flex-1 py-2.5 rounded-xl bg-[#1b7a4b] hover:bg-[#156a40] text-white font-bold text-xs transition shadow-xs cursor-pointer"
                 >
-                  Simpan Pembayaran
+                  {editingPayment ? 'Simpan Perubahan' : 'Simpan Pembayaran'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPayingDebt(null)}
+                  onClick={() => { setPayingDebt(null); setEditingPayment(null); }}
                   className="py-2.5 px-4 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition cursor-pointer"
                 >
                   Batal
