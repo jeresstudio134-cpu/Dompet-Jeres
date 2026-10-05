@@ -28,6 +28,6 @@ async function setupFrontend() {
 
 await setupFrontend();
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server Dompet Jeres aktif di port ${PORT}`);
 });

@@ -1,5 +1,5 @@
 import { Transaction, Account } from '../types/finance.ts';
-import { INITIAL_ACCOUNTS, INITIAL_CATEGORIES, INITIAL_TRANSACTIONS } from '../data/initialData.ts';
+import { INITIAL_ACCOUNTS, INITIAL_CATEGORIES, INITIAL_KANTONG, INITIAL_TRANSACTIONS } from '../data/initialData.ts';
 import type { Debt, DebtPayment, YearlyArchive } from '../types/finance.ts';
 
 const API_URL = '/api/transactions';
@@ -8,6 +8,7 @@ const TOKEN_KEY = 'dompet_admin_token';
 const LOCAL_ACC_KEY = 'dompet_pintar_accounts';
 const LOCAL_TX_KEY = 'dompet_pintar_transactions';
 const LOCAL_CAT_KEY = 'dompet_pintar_categories';
+const LOCAL_KANTONG_KEY = 'dompet_pintar_kantong';
 const LOCAL_STORE_NAME_KEY = 'dompet_toko_store_name';
 const LOCAL_OWNER_NAME_KEY = 'dompet_toko_owner_name';
 const LOCAL_PIN_KEY = 'dompet_toko_admin_pin';
@@ -118,6 +119,23 @@ function getLocalCategories(): string[] {
 function saveLocalCategories(categories: string[]) {
   try {
     localStorage.setItem(LOCAL_CAT_KEY, JSON.stringify(categories));
+  } catch {}
+}
+
+export function getLocalKantong(): string[] {
+  try {
+    const stored = localStorage.getItem(LOCAL_KANTONG_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return INITIAL_KANTONG;
+}
+
+export function saveLocalKantong(kantongList: string[]) {
+  try {
+    localStorage.setItem(LOCAL_KANTONG_KEY, JSON.stringify(kantongList));
   } catch {}
 }
 
@@ -232,6 +250,7 @@ export const apiLoadAll = async (): Promise<{
   accounts: Account[];
   transactions: Transaction[];
   categories: string[];
+  kantongList: string[];
   storeName: string | null;
   ownerName: string | null;
 }> => {
@@ -244,6 +263,7 @@ export const apiLoadAll = async (): Promise<{
         const serverAccounts = (json.accounts || []) as Account[];
         const serverTransactions = (json.transactions || []) as Transaction[];
         const serverCategories = (json.categories || []) as string[];
+        const serverKantongs = (json.kantongs || []) as string[];
         const serverStoreName = (json.storeName ?? null) as string | null;
         const serverOwnerName = (json.ownerName ?? null) as string | null;
 
@@ -251,6 +271,7 @@ export const apiLoadAll = async (): Promise<{
         if (serverAccounts.length > 0) saveLocalAccounts(serverAccounts);
         if (serverTransactions.length > 0) saveLocalTransactions(serverTransactions);
         if (serverCategories.length > 0) saveLocalCategories(serverCategories);
+        if (serverKantongs.length > 0) saveLocalKantong(serverKantongs);
         if (serverStoreName) saveLocalStoreName(serverStoreName);
         if (serverOwnerName) saveLocalOwnerName(serverOwnerName);
 
@@ -258,6 +279,7 @@ export const apiLoadAll = async (): Promise<{
           accounts: serverAccounts,
           transactions: serverTransactions,
           categories: serverCategories,
+          kantongList: serverKantongs.length > 0 ? serverKantongs : getLocalKantong(),
           storeName: serverStoreName,
           ownerName: serverOwnerName,
         };
@@ -272,6 +294,7 @@ export const apiLoadAll = async (): Promise<{
     accounts: getLocalAccounts(),
     transactions: getLocalTransactions(),
     categories: getLocalCategories(),
+    kantongList: getLocalKantong(),
     storeName: getLocalStoreName(),
     ownerName: getLocalOwnerName(),
   };
@@ -358,7 +381,7 @@ export const apiDeleteAccount = async (id: string): Promise<void> => {
 };
 
 // ============================================
-// KATEGORI
+// KATEGORI & KANTONG
 // ============================================
 
 export const apiAddCategory = async (name: string): Promise<void> => {
@@ -383,6 +406,27 @@ export const apiDeleteCategory = async (name: string): Promise<void> => {
   } else {
     const current = getLocalCategories();
     saveLocalCategories(current.filter(c => c !== name));
+  }
+};
+
+export const apiAddKantong = async (name: string): Promise<void> => {
+  const current = getLocalKantong();
+  if (!current.includes(name)) saveLocalKantong([...current, name]);
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    await safeRequest(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ entity: 'kantong', name }),
+    });
+  }
+};
+
+export const apiDeleteKantong = async (name: string): Promise<void> => {
+  const current = getLocalKantong();
+  saveLocalKantong(current.filter(k => k !== name));
+  const hasBackend = await checkBackend();
+  if (hasBackend) {
+    await safeRequest(`${API_URL}?entity=kantong&name=${encodeURIComponent(name)}`, { method: 'DELETE' });
   }
 };
 

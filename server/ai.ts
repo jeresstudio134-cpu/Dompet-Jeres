@@ -139,7 +139,6 @@ export async function runAiParse(input: AiInput) {
   }
 
   const accountIds = accountRows.map(a => a.id);
-  const categoryNames = categoryRows.map(c => c.name);
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
 
   const parts: any[] = [{ text: buildAiPrompt(accountRows, categoryNames, today, Boolean(imageBase64)) }];

@@ -35,7 +35,7 @@ export const INITIAL_ACCOUNTS: Account[] = [
   },
 ];
 
-export const INITIAL_CATEGORIES: string[] = [
+export const INITIAL_KANTONG: string[] = [
   'Toko',
   'Pemasukan Toko',
   'Pribadi',
@@ -45,7 +45,27 @@ export const INITIAL_CATEGORIES: string[] = [
   'Operasional Toko',
   'Abah Rahmadi',
   'Pinjam Ali',
-  'Pindah Saldo',
+];
+
+export const INITIAL_CATEGORIES: string[] = [
+  'Pemasukan Toko',
+  'Belanja Barang / Modal',
+  'Operasional Toko',
+  'Makanan & Minuman',
+  'Kebutuhan Pokok',
+  'Transportasi & Bensin',
+  'Listrik, Air & Wifi',
+  'Bangun Rumah & Material',
+  'Pribadi & Jajan',
+  'Gaji & Upah',
+  'Toko',
+  'Pribadi',
+  'Pokok',
+  'Kendaraan',
+  'Bangun Rumah',
+  'Abah Rahmadi',
+  'Pinjam Ali',
+  'Lain-lain',
 ];
 
 // Seeded transactions matching screenshot & spreadsheet

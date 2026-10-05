@@ -3,6 +3,8 @@ import { adminContext } from './auth.js';
 import { ensureSchema } from './ensureSchema.js';
 import { errorHandler } from './http.js';
 import transactionsRouter from './routes/transactions.js';
+import debtsHandler from '../api/debts.js';
+import aiParseDebtHandler from '../api/ai-parse-debt.js';
 
 export function createApp() {
   const app = express();
@@ -29,6 +31,8 @@ export function createApp() {
   app.use('/api', adminContext);
 
   app.use('/api/transactions', transactionsRouter);
+  app.all('/api/debts', (req, res) => debtsHandler(req, res));
+  app.all('/api/ai-parse-debt', (req, res) => aiParseDebtHandler(req, res));
   app.use('/api', (_req, res) => {
     res.status(404).json({ success: false, error: 'Endpoint tidak ditemukan.' });
   });

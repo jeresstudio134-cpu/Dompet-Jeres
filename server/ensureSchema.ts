@@ -49,6 +49,12 @@ export function ensureSchema(): Promise<void> {
           )
         `),
         db.execute(sql`
+          CREATE TABLE IF NOT EXISTS kantongs (
+            name VARCHAR(50) PRIMARY KEY,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `),
+        db.execute(sql`
           CREATE TABLE IF NOT EXISTS settings (
             key VARCHAR(50) PRIMARY KEY,
             value TEXT NOT NULL,
@@ -61,6 +67,7 @@ export function ensureSchema(): Promise<void> {
         db.execute(sql`CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (date)`),
         db.execute(sql`CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)`),
         db.execute(sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT`),
+        db.execute(sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS kantong VARCHAR(50)`),
       ]);
     })().catch(err => {
       ready = null; // coba lagi di permintaan berikutnya

@@ -26,7 +26,8 @@ export interface Transaction {
   description: string;
   accountId: string;
   type: TransactionType;
-  category: string;
+  category: string; // Kategori (mis. Makanan, Bensin, Operasional)
+  kantong?: string; // Kantong (mis. Toko, Pribadi, Pokok, dll.)
   amount: number;
   notes?: string;
   catatan?: string;
@@ -40,6 +41,7 @@ export interface FilterState {
   accountId: string; // 'ALL' or account id
   type: 'ALL' | TransactionType;
   category: string; // 'ALL' or category name
+  kantong: string; // 'ALL' or kantong name
   searchQuery: string;
   dateFrom: string;
   dateTo: string;

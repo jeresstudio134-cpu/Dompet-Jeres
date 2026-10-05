@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../../src/db/index.js';
-import { accounts, categories, transactions } from '../../src/db/schema.js';
+import { accounts, categories, kantongs, transactions } from '../../src/db/schema.js';
 import { checkAiRateLimit, runAiParse } from '../ai.js';
 import {
   assertAdmin,
@@ -33,6 +33,7 @@ const toTx = (r: typeof transactions.$inferSelect) => ({
   accountId: r.accountId ?? '',
   type: r.type,
   category: r.category,
+  kantong: r.kantong ?? undefined,
   amount: Number(r.amount) || 0,
   notes: r.notes ?? undefined,
   catatan: r.notes ?? undefined,
@@ -67,7 +68,8 @@ function toRow(tx: any): typeof transactions.$inferInsert {
     description: description.slice(0, 255),
     accountId: tx.accountId || 'cash',
     type: tx.type === 'masuk' ? 'masuk' : 'keluar',
-    category: typeof tx.category === 'string' ? tx.category.slice(0, 50) : 'Toko',
+    category: typeof tx.category === 'string' ? tx.category.slice(0, 50) : 'Lainnya',
+    kantong: typeof tx.kantong === 'string' && tx.kantong.trim() ? tx.kantong.trim().slice(0, 50) : null,
     amount: Math.round(Number(tx.amount)) || 0,
     notes,
     transferTargetAccountId: tx.transferTargetAccountId ?? null,
@@ -92,6 +94,7 @@ async function upsertTransactions(rows: (typeof transactions.$inferInsert)[]) {
           accountId: sql`excluded.account_id`,
           type: sql`excluded.type`,
           category: sql`excluded.category`,
+          kantong: sql`excluded.kantong`,
           amount: sql`excluded.amount`,
           notes: sql`excluded.notes`,
           transferTargetAccountId: sql`excluded.transfer_target_account_id`,
@@ -142,13 +145,14 @@ router.get(
       });
     }
     const db = getDb();
-    const [txRows, accRows, catRows, storeName, ownerName] = await Promise.all([
+    const [txRows, accRows, catRows, kantongRows, storeName, ownerName] = await Promise.all([
       db
         .select()
         .from(transactions)
         .orderBy(desc(transactions.date), sql`${transactions.no} DESC NULLS LAST`, desc(transactions.id)),
       db.select().from(accounts).orderBy(asc(accounts.id)),
       db.select({ name: categories.name }).from(categories).orderBy(asc(categories.createdAt), asc(categories.name)),
+      db.select({ name: kantongs.name }).from(kantongs).orderBy(asc(kantongs.createdAt), asc(kantongs.name)),
       getSetting('store_name'),
       getSetting('owner_name'),
     ]);
@@ -156,6 +160,7 @@ router.get(
     res.json({
       success: true,
       categories: catRows.map(c => c.name),
+      kantongs: kantongRows.map(k => k.name),
       storeName,
       ownerName,
       transactions: txRows.map(toTx),
@@ -238,6 +243,14 @@ const writeHandler = asyncHandler(async (req, res) => {
     const name = String(body.name).trim().slice(0, 50);
     if (!name) throw new HttpError(400, 'Nama kategori kosong.');
     await db.insert(categories).values({ name }).onConflictDoNothing();
+    return res.json({ success: true, name });
+  }
+
+  // Tambah 1 kantong (kasir boleh)
+  if (body.entity === 'kantong' && body.name) {
+    const name = String(body.name).trim().slice(0, 50);
+    if (!name) throw new HttpError(400, 'Nama kantong kosong.');
+    await db.insert(kantongs).values({ name }).onConflictDoNothing();
     return res.json({ success: true, name });
   }
 
@@ -331,6 +344,16 @@ router.delete(
       await db.batch([
         db.update(transactions).set({ category: '' }).where(eq(transactions.category, name)),
         db.delete(categories).where(eq(categories.name, name)),
+      ]);
+      return res.json({ success: true, deletedName: name });
+    }
+
+    if (entity === 'kantong') {
+      const name = queryString(req.query.name);
+      if (!name) throw new HttpError(400, 'Missing kantong name.');
+      await db.batch([
+        db.update(transactions).set({ kantong: null }).where(eq(transactions.kantong, name)),
+        db.delete(kantongs).where(eq(kantongs.name, name)),
       ]);
       return res.json({ success: true, deletedName: name });
     }

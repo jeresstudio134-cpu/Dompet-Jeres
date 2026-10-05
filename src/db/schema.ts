@@ -21,6 +21,7 @@ export const transactions = pgTable('transactions', {
   accountId: varchar('account_id', { length: 50 }).references(() => accounts.id),
   type: varchar('type', { length: 10 }).notNull(), // 'masuk' | 'keluar'
   category: varchar('category', { length: 50 }).notNull(),
+  kantong: varchar('kantong', { length: 50 }),
   amount: bigint('amount', { mode: 'number' }).notNull(),
   notes: text('notes'),
   transferTargetAccountId: varchar('transfer_target_account_id', { length: 50 }),
@@ -35,8 +36,15 @@ export const settings = pgTable('settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
-// 4. Kategori / Kantong
+// 4. Kategori
 export const categories = pgTable('categories', {
+  name: varchar('name', { length: 50 }).primaryKey(),
+  openingBalance: bigint('opening_balance', { mode: 'number' }).default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+// 4b. Kantong (Pos Anggaran)
+export const kantongs = pgTable('kantongs', {
   name: varchar('name', { length: 50 }).primaryKey(),
   openingBalance: bigint('opening_balance', { mode: 'number' }).default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

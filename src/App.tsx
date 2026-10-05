@@ -32,6 +32,8 @@ import {
   apiDeleteAccount,
   apiAddCategory,
   apiDeleteCategory,
+  apiAddKantong,
+  apiDeleteKantong,
   apiSaveSetting,
   getAdminToken,
   clearAdminToken,
@@ -99,6 +101,7 @@ export default function App() {
   };
 
   const [categories, setCategories] = useState<string[]>([]);
+  const [kantongList, setKantongList] = useState<string[]>([]);
 
   const handleAddCategory = async (newCat: string) => {
     const trimmed = newCat.trim();
@@ -123,6 +126,32 @@ export default function App() {
     } catch (e) {
       console.error(e);
       showToast('Gagal menghapus kategori. Periksa koneksi lalu coba lagi.', 'error');
+    }
+  };
+
+  const handleAddKantong = async (newKt: string) => {
+    const trimmed = newKt.trim();
+    if (!trimmed || isExcludedCategory(trimmed)) return;
+    if (kantongList.some(k => k.toLowerCase() === trimmed.toLowerCase())) return;
+    try {
+      await apiAddKantong(trimmed);
+      setKantongList(prev => [...prev, trimmed]);
+      showToast(`Kantong baru "${trimmed}" berhasil ditambahkan!`);
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal menambah kantong. Periksa koneksi lalu coba lagi.', 'error');
+    }
+  };
+
+  const handleDeleteKantong = async (ktToDelete: string) => {
+    try {
+      await apiDeleteKantong(ktToDelete);
+      setKantongList(prev => prev.filter(k => k !== ktToDelete));
+      setTransactions(prev => prev.map(t => (t.kantong === ktToDelete ? { ...t, kantong: '' } : t)));
+      showToast(`Kantong "${ktToDelete}" telah dihapus.`, 'info');
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal menghapus kantong. Periksa koneksi lalu coba lagi.', 'error');
     }
   };
 
@@ -258,6 +287,7 @@ export default function App() {
     accountId: 'ALL',
     type: 'ALL',
     category: 'ALL',
+    kantong: 'ALL',
     searchQuery: '',
     dateFrom: '',
     dateTo: '',
@@ -423,9 +453,15 @@ export default function App() {
         await Promise.all(cats.map(c => apiAddCategory(c))).catch(() => {});
       }
 
+      let kts = (data.kantongList || []).filter(k => !isExcludedCategory(k));
+      if (kts.length === 0) {
+        kts = INITIAL_KANTONG.filter(k => !isExcludedCategory(k));
+      }
+
       setAccounts(accs);
       setTransactions(data.transactions);
       setCategories(cats);
+      setKantongList(kts);
       if (data.storeName && data.storeName.trim()) setStoreName(data.storeName.trim());
       if (data.ownerName && data.ownerName.trim()) setOwnerName(data.ownerName.trim());
       setIsLoading(false);
@@ -527,6 +563,13 @@ export default function App() {
       if (filter.dateTo && t.date > filter.dateTo) return false;
       if (filter.accountId !== 'ALL' && t.accountId !== filter.accountId) return false;
       if (filter.type !== 'ALL' && t.type !== filter.type) return false;
+      if (filter.kantong && filter.kantong !== 'ALL') {
+        if (filter.kantong === 'EMPTY') {
+          if (t.kantong && t.kantong.trim() !== '' && t.kantong !== '-') return false;
+        } else if (t.kantong !== filter.kantong) {
+          return false;
+        }
+      }
       if (filter.category !== 'ALL') {
         if (filter.category === 'EMPTY') {
           if (t.category && t.category.trim() !== '' && t.category !== '-') return false;
@@ -536,7 +579,13 @@ export default function App() {
       }
       if (filter.searchQuery.trim()) {
         const q = filter.searchQuery.toLowerCase();
-        if (!t.description.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
+        if (
+          !t.description.toLowerCase().includes(q) &&
+          !t.category?.toLowerCase().includes(q) &&
+          !t.kantong?.toLowerCase().includes(q) &&
+          !t.notes?.toLowerCase().includes(q) &&
+          !t.catatan?.toLowerCase().includes(q)
+        ) return false;
       }
       return true;
     });
@@ -646,6 +695,60 @@ export default function App() {
     } catch (e) {
       console.error(e);
       showToast('Gagal memindahkan saldo. Periksa koneksi lalu coba lagi.', 'error');
+      return false;
+    }
+  };
+
+  // Handler: Pindah Kantong
+  const handleTransferKantong = async (
+    fromKt: string,
+    toKt: string,
+    accountId: string,
+    amount: number,
+    date: string,
+    notes: string
+  ): Promise<boolean> => {
+    const baseNo = getNextNo();
+    const stamp = Date.now();
+    const outId = `kt-${stamp}-out`;
+    const inId = `kt-${stamp}-in`;
+
+    const txKeluar: Transaction = {
+      id: outId,
+      no: baseNo,
+      date,
+      description: notes ? `${notes} (untuk ${toKt})` : `Pindah jatah ke ${toKt}`,
+      accountId,
+      type: 'keluar',
+      category: 'Pindah Kantong',
+      kantong: fromKt,
+      amount,
+      linkedTransactionId: inId,
+      createdAt: new Date().toISOString(),
+    };
+
+    const txMasuk: Transaction = {
+      id: inId,
+      no: baseNo + 1,
+      date,
+      description: notes ? `${notes} (dari ${fromKt})` : `Pindah jatah dari ${fromKt}`,
+      accountId,
+      type: 'masuk',
+      category: 'Pindah Kantong',
+      kantong: toKt,
+      amount,
+      linkedTransactionId: outId,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await apiSaveTransactions([txMasuk, txKeluar]);
+      setTransactions(prev => [txMasuk, txKeluar, ...prev]);
+      showToast(`Pindah jatah kantong ${formatRupiah(amount)} dari "${fromKt}" ke "${toKt}" berhasil!`);
+      return true;
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal memindahkan jatah kantong. Periksa koneksi lalu coba lagi.', 'error');
       return false;
     }
   };
@@ -805,6 +908,7 @@ export default function App() {
             neonConfig={neonConfig}
             onAddTransaction={handleSaveTransaction}
             onTransfer={handleTransfer}
+            onTransferKantong={handleTransferKantong}
             onTransferCategory={handleTransferCategory}
             onUndoLast={handleUndoLast}
             onDeleteTransaction={handleDeleteTransaction}
@@ -815,6 +919,9 @@ export default function App() {
             categories={categories}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
+            kantongList={kantongList}
+            onAddKantong={handleAddKantong}
+            onDeleteKantong={handleDeleteKantong}
             filter={filter}
             onFilterChange={(newF) => setFilter(prev => ({ ...prev, ...newF }))}
             monthOptions={monthOptions}

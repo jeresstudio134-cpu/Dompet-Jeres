@@ -22,6 +22,7 @@ import confetti from 'canvas-confetti';
 import { Transaction, Account, TransactionType, FilterState, MonthlyStats, NeonConfig } from '../types/finance.ts';
 import { formatRupiah, getCurrentDateIndo, formatTanggalIndo, parseRupiahInput } from '../utils/formatters.ts';
 import { escapeHtml, printHtml } from '../utils/printReport.ts';
+import { INITIAL_KANTONG, INITIAL_CATEGORIES } from '../data/initialData.ts';
 
 // Pindah kategori disimpan sebagai dua baris berawalan "kt-":
 // keluar dari kategori asal dan masuk ke kategori tujuan, di akun yang sama (saldo akun tidak berubah)
@@ -42,6 +43,14 @@ interface DompetTokoViewProps {
     date: string,
     notes: string
   ) => Promise<boolean>;
+  onTransferKantong?: (
+    fromKt: string,
+    toKt: string,
+    accountId: string,
+    amount: number,
+    date: string,
+    notes: string
+  ) => Promise<boolean>;
   onUndoLast: () => void;
   onDeleteTransaction: (id: string) => void;
   onEditTransaction: (tx: Transaction) => void;
@@ -51,6 +60,9 @@ interface DompetTokoViewProps {
   categories: string[];
   onAddCategory?: (newCategory: string) => void;
   onDeleteCategory?: (category: string) => void;
+  kantongList?: string[];
+  onAddKantong?: (newKantong: string) => void;
+  onDeleteKantong?: (kantong: string) => void;
   filter: FilterState;
   onFilterChange: (newFilter: Partial<FilterState>) => void;
   monthOptions: { value: string; label: string }[];
@@ -68,6 +80,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   onAddTransaction,
   onTransfer,
   onTransferCategory,
+  onTransferKantong,
   onUndoLast,
   onDeleteTransaction,
   onEditTransaction,
@@ -77,6 +90,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   categories,
   onAddCategory,
   onDeleteCategory,
+  kantongList,
+  onAddKantong,
+  onDeleteKantong,
   filter,
   onFilterChange,
   monthOptions,
@@ -102,6 +118,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const [editJenis, setEditJenis] = useState<'masuk' | 'keluar'>('keluar');
   const [editNominalStr, setEditNominalStr] = useState('0');
   const [editKategori, setEditKategori] = useState('');
+  const [editKantong, setEditKantong] = useState('');
   const [editCatatan, setEditCatatan] = useState('');
 
   const handleStartEdit = (tx: Transaction) => {
@@ -116,6 +133,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     setEditJenis(tx.type);
     setEditNominalStr(tx.amount.toLocaleString('id-ID'));
     setEditKategori(tx.category || '');
+    setEditKantong(tx.kantong || '');
     setEditCatatan(tx.notes || tx.catatan || '');
   };
 
@@ -129,7 +147,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       return;
     }
     if (!editKategori.trim()) {
-      alert('Kantong wajib dipilih.');
+      alert('Kategori wajib dipilih.');
       return;
     }
 
@@ -143,6 +161,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       type: editJenis,
       amount: parsedAmount,
       category: editKategori.trim(),
+      kantong: editKantong.trim() || undefined,
       notes: trimmedCatatan || undefined,
       catatan: trimmedCatatan || undefined,
     };
@@ -155,14 +174,21 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const [tanggal, setTanggal] = useState(getCurrentDateIndo());
   const [jenis, setJenis] = useState<TransactionType>('keluar');
   const [selectedAkun, setSelectedAkun] = useState<string>('cash');
-  const [keterangan, setKeterangan] = useState<string>('');
+  const [Keterangan, setKeterangan] = useState<string>('');
   const [nominalStr, setNominalStr] = useState<string>('');
   const [kategori, setKategori] = useState<string>('');
+  const [kantong, setKantong] = useState<string>('');
+  const [catatan, setCatatan] = useState<string>('');
 
   // State for adding new category & managing/deleting categories
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  // State for adding new kantong & managing/deleting kantong
+  const [isAddingNewKantong, setIsAddingNewKantong] = useState(false);
+  const [isManagingKantong, setIsManagingKantong] = useState(false);
+  const [newKantongInput, setNewKantongInput] = useState('');
 
   // Form states for 'Pindah Saldo'
   const [transferDari, setTransferDari] = useState<string>('seabank');
@@ -170,8 +196,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const [transferNominalStr, setTransferNominalStr] = useState<string>('');
   const [transferKeterangan, setTransferKeterangan] = useState<string>('');
 
-  // Form states for 'Pindah Kategori'
-  const [pindahMode, setPindahMode] = useState<'akun' | 'kategori'>('akun');
+  // Form states for 'Pindah Kantong' / 'Pindah Kategori'
+  const [pindahMode, setPindahMode] = useState<'akun' | 'kantong' | 'kategori'>('akun');
   const [ktDari, setKtDari] = useState<string>('');
   const [ktKe, setKtKe] = useState<string>('');
   const [ktAkun, setKtAkun] = useState<string>('');
@@ -196,7 +222,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
   
     
-   // Hanya menyimpan input keterangan tanpa auto-detect apapun
+   // Hanya menyimpan input Keterangan tanpa auto-detect apapun
   const handleKeteranganChange = (val: string) => {
     setKeterangan(val);
   };   
@@ -232,7 +258,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseRupiahInput(nominalStr);
-    if (!keterangan.trim()) {
+    if (!Keterangan.trim()) {
       alert('Keterangan transaksi wajib diisi.');
       return;
     }
@@ -241,17 +267,24 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       return;
     }
     if (!kategori.trim()) {
-      alert('Kantong wajib dipilih ketika mencatat transaksi.');
+      alert('Kategori transaksi wajib dipilih.');
       return;
     }
 
+    const trimmedCatatan = catatan.trim();
+    const chosenCategory = kategori.trim();
+    const chosenKantong = kantong.trim() || undefined;
+
     const ok = await onAddTransaction({
       date: tanggal,
-      description: keterangan.trim(),
+      description: Keterangan.trim(),
       accountId: selectedAkun,
       type: jenis,
-      category: kategori.trim(),
+      category: chosenCategory,
+      kantong: chosenKantong,
       amount,
+      notes: trimmedCatatan || undefined,
+      catatan: trimmedCatatan || undefined,
     });
 
     if (ok === false) return;
@@ -259,6 +292,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     setKeterangan('');
     setNominalStr('');
     setKategori('');
+    setKantong('');
+    setCatatan('');
   };
 
   // Submit 'Pindah Saldo'
@@ -310,28 +345,98 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     }
   };
 
+  // Function to save newly created kantong
+  const handleSaveNewKantong = () => {
+    const trimmed = newKantongInput.trim();
+    if (!trimmed || isExcludedCategory(trimmed)) return;
+    if (onAddKantong) {
+      onAddKantong(trimmed);
+    }
+    setKantong(trimmed);
+    setNewKantongInput('');
+    setIsAddingNewKantong(false);
+  };
+
+  // Function to delete a kantong
+  const handleDeleteKantong = (ktToDelete: string) => {
+    if (onDeleteKantong) {
+      onDeleteKantong(ktToDelete);
+    }
+    if (kantong === ktToDelete) {
+      setKantong('');
+    }
+  };
+
+  // All unique kantong for filter & recording
+  const allKantong = React.useMemo(() => {
+    const set = new Set<string>();
+    (kantongList && kantongList.length > 0 ? kantongList : INITIAL_KANTONG).forEach(k => {
+      if (!isExcludedCategory(k)) set.add(k.trim());
+    });
+    transactions.forEach(t => {
+      if (t.kantong && !isExcludedCategory(t.kantong)) {
+        set.add(t.kantong.trim());
+      }
+    });
+    return Array.from(set);
+  }, [kantongList, transactions]);
+
   // All unique categories for filter & recording (strictly excluding 'Lainnya' / 'lainya')
   const allCategories = React.useMemo(() => {
     const set = new Set<string>();
-    categories.forEach(c => {
+    (categories.length > 0 ? categories : INITIAL_CATEGORIES).forEach(c => {
       if (!isExcludedCategory(c)) set.add(c.trim());
     });
     transactions.forEach(t => {
-      if (!isExcludedCategory(t.category)) {
-        set.add(t.category!.trim());
+      if (t.category && !isExcludedCategory(t.category) && t.category !== 'Pindah Saldo' && t.category !== 'Pindah Kantong') {
+        set.add(t.category.trim());
       }
     });
     return Array.from(set);
   }, [categories, transactions]);
 
-  // Saldo kantong sebuah kategori (semua transaksi, termasuk pindah kategori)
-  const pocketBalance = (cat: string) =>
-    transactions.reduce(
-      (sum, t) => (t.category === cat ? sum + (t.type === 'masuk' ? t.amount : -t.amount) : sum),
-      0
-    );
+  // Saldo kantong (semua transaksi dengan kantong tersebut)
+  const pocketBalance = (ktName: string) => {
+    const target = ktName.trim().toLowerCase();
+    return transactions.reduce((sum, t) => {
+      if (!t.kantong) return sum;
+      const tKt = t.kantong.trim().toLowerCase();
+      if (tKt !== target) return sum;
+      return sum + (t.type === 'masuk' ? t.amount : -t.amount);
+    }, 0);
+  };
+
+  // Saldo kategori (semua transaksi dengan kategori tersebut)
+  const categoryBalance = (catName: string) => {
+    const target = catName.trim().toLowerCase();
+    return transactions.reduce((sum, t) => {
+      if (!t.category) return sum;
+      const tCat = t.category.trim().toLowerCase();
+      if (tCat !== target) return sum;
+      return sum + (t.type === 'masuk' ? t.amount : -t.amount);
+    }, 0);
+  };
 
   const ktAkunId = accounts.some(a => a.id === ktAkun) ? ktAkun : accounts[0]?.id || '';
+
+  // Submit 'Pindah Kantong'
+  const handlePindahKantong = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseRupiahInput(ktNominalStr);
+    if (!ktDari || !ktKe || ktDari === ktKe || amount <= 0 || !ktAkunId) return;
+
+    let ok = false;
+    if (onTransferKantong) {
+      ok = await onTransferKantong(ktDari, ktKe, ktAkunId, amount, tanggal, ktKeterangan.trim());
+    } else {
+      ok = await onTransferCategory(ktDari, ktKe, ktAkunId, amount, tanggal, ktKeterangan.trim());
+    }
+    if (!ok) return;
+
+    confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
+    setKtNominalStr('');
+    setKtKeterangan('');
+  };
 
   // Submit 'Pindah Kategori'
   const handlePindahKategori = async (e: React.FormEvent) => {
@@ -350,14 +455,22 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   // Filter pagination limit
   const [filterDisplayCount, setFilterDisplayCount] = useState<number>(30);
 
-  // Satu aturan filter dipakai bersama oleh daftar transaksi dan kedua rekap.
-  // skip: abaikan satu filter supaya rekapnya tetap menampilkan semua pilihan (akun atau kategori)
-  const matchesFilter = (t: Transaction, skip?: 'category' | 'account') => {
+  // Satu aturan filter dipakai bersama oleh daftar transaksi dan rekap.
+  // skip: abaikan satu filter supaya rekapnya tetap menampilkan semua pilihan (akun, kantong, atau kategori)
+  const matchesFilter = (t: Transaction, skip?: 'category' | 'account' | 'kantong') => {
     if (filter.monthYear !== 'ALL' && !t.date.startsWith(filter.monthYear)) return false;
     if (filter.dateFrom && t.date < filter.dateFrom) return false;
     if (filter.dateTo && t.date > filter.dateTo) return false;
     if (skip !== 'account' && filter.accountId !== 'ALL' && t.accountId !== filter.accountId) return false;
     if (filter.type !== 'ALL' && t.type !== filter.type) return false;
+    if (skip !== 'kantong' && filter.kantong && filter.kantong !== 'ALL') {
+      const tKt = (t.kantong || '').trim();
+      if (filter.kantong === 'EMPTY') {
+        if (tKt && tKt !== '-') return false;
+      } else if (tKt !== filter.kantong) {
+        return false;
+      }
+    }
     if (skip !== 'category' && filter.category !== 'ALL') {
       if (filter.category === 'EMPTY') {
         if (t.category && t.category.trim() !== '' && t.category !== '-') return false;
@@ -367,35 +480,44 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     }
     if (filter.searchQuery.trim()) {
       const q = filter.searchQuery.toLowerCase();
-      if (!t.description.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
+      if (
+        !t.description.toLowerCase().includes(q) &&
+        !t.category?.toLowerCase().includes(q) &&
+        !t.kantong?.toLowerCase().includes(q) &&
+        !t.notes?.toLowerCase().includes(q) &&
+        !t.catatan?.toLowerCase().includes(q)
+      ) return false;
     }
     return true;
   };
 
   const filteredList = transactions.filter(t => matchesFilter(t));
 
-  // Kantong (kartu di halaman utama): saldo tiap kategori sepanjang waktu
+  // Kantong (kartu di halaman utama): saldo tiap kantong sepanjang waktu
   const pockets = (() => {
-    const map = new Map<string, { masuk: number; keluar: number; pindah: number }>();
+    const map = new Map<string, { masuk: number; keluar: number }>();
+    allKantong.forEach(kt => {
+      map.set(kt, { masuk: 0, keluar: 0 });
+    });
     transactions.forEach(t => {
       if (t.category === 'Pindah Saldo') return;
-      const key = t.category && t.category.trim() && t.category !== '-' ? t.category : 'EMPTY';
-      const row = map.get(key) || { masuk: 0, keluar: 0, pindah: 0 };
-      if (isCatTransfer(t)) row.pindah += t.type === 'masuk' ? t.amount : -t.amount;
-      else if (t.type === 'masuk') row.masuk += t.amount;
+      if (!t.kantong || !t.kantong.trim() || t.kantong === '-') return;
+      const key = t.kantong.trim();
+      const row = map.get(key) || { masuk: 0, keluar: 0 };
+      if (t.type === 'masuk') row.masuk += t.amount;
       else row.keluar += t.amount;
       map.set(key, row);
     });
     return Array.from(map.entries())
       .map(([key, v]) => ({
         key,
-        label: key === 'EMPTY' ? 'Tanpa Kategori' : key,
+        label: key,
         masuk: v.masuk,
         keluar: v.keluar,
-        pindah: v.pindah,
-        saldo: v.masuk - v.keluar + v.pindah,
+        pindah: 0,
+        saldo: v.masuk - v.keluar,
       }))
-      .sort((a, b) => b.masuk + b.keluar + Math.abs(b.pindah) - (a.masuk + a.keluar + Math.abs(a.pindah)));
+      .sort((a, b) => (b.masuk + b.keluar) - (a.masuk + a.keluar));
   })();
 
   // Selisih antara total akun dan total kantong (mis. saldo awal akun yang belum punya kantong)
@@ -403,16 +525,39 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   const totalKantong = pockets.reduce((sum, p) => sum + p.saldo, 0);
   const diluarKantong = totalAkun - totalKantong;
 
-  // Rekap per kantong (kategori): ikut semua filter kecuali filter kategori
+  // Rekap per kantong: ikut semua filter kecuali filter kantong
+  const kantongRecap = (() => {
+    const map = new Map<string, { masuk: number; keluar: number }>();
+    transactions.forEach(t => {
+      if (!matchesFilter(t, 'kantong')) return;
+      if (t.category === 'Pindah Saldo') return;
+      const key = t.kantong && t.kantong.trim() && t.kantong !== '-' ? t.kantong : 'EMPTY';
+      const row = map.get(key) || { masuk: 0, keluar: 0 };
+      if (t.type === 'masuk') row.masuk += t.amount;
+      else row.keluar += t.amount;
+      map.set(key, row);
+    });
+    return Array.from(map.entries())
+      .map(([key, v]) => ({
+        key,
+        label: key === 'EMPTY' ? 'Tanpa Kantong' : key,
+        masuk: v.masuk,
+        keluar: v.keluar,
+        pindah: 0,
+        selisih: v.masuk - v.keluar,
+      }))
+      .sort((a, b) => (b.masuk + b.keluar) - (a.masuk + a.keluar));
+  })();
+
+  // Rekap per kategori: ikut semua filter kecuali filter kategori
   const categoryRecap = (() => {
-    const map = new Map<string, { masuk: number; keluar: number; pindah: number }>();
+    const map = new Map<string, { masuk: number; keluar: number }>();
     transactions.forEach(t => {
       if (!matchesFilter(t, 'category')) return;
-      if (t.category === 'Pindah Saldo') return;
+      if (t.category === 'Pindah Saldo' || t.category === 'Pindah Kantong') return;
       const key = t.category && t.category.trim() && t.category !== '-' ? t.category : 'EMPTY';
-      const row = map.get(key) || { masuk: 0, keluar: 0, pindah: 0 };
-      if (isCatTransfer(t)) row.pindah += t.type === 'masuk' ? t.amount : -t.amount;
-      else if (t.type === 'masuk') row.masuk += t.amount;
+      const row = map.get(key) || { masuk: 0, keluar: 0 };
+      if (t.type === 'masuk') row.masuk += t.amount;
       else row.keluar += t.amount;
       map.set(key, row);
     });
@@ -422,10 +567,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         label: key === 'EMPTY' ? 'Tanpa Kategori' : key,
         masuk: v.masuk,
         keluar: v.keluar,
-        pindah: v.pindah,
-        selisih: v.masuk - v.keluar + v.pindah,
+        pindah: 0,
+        selisih: v.masuk - v.keluar,
       }))
-      .sort((a, b) => b.masuk + b.keluar + Math.abs(b.pindah) - (a.masuk + a.keluar + Math.abs(a.pindah)));
+      .sort((a, b) => (b.masuk + b.keluar) - (a.masuk + a.keluar));
   })();
 
   // Rekap per akun: ikut semua filter kecuali filter akun
@@ -514,6 +659,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     filter.monthYear !== 'ALL' ||
     filter.accountId !== 'ALL' ||
     filter.type !== 'ALL' ||
+    (filter.kantong && filter.kantong !== 'ALL') ||
     filter.category !== 'ALL' ||
     filter.searchQuery.trim() ||
     filter.dateFrom ||
@@ -525,6 +671,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       monthYear: 'ALL',
       accountId: 'ALL',
       type: 'ALL',
+      kantong: 'ALL',
       category: 'ALL',
       searchQuery: '',
       dateFrom: '',
@@ -796,17 +943,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             <span>Otomatis</span>
           </button>
 
-          <button
-            onClick={onOpenNeonModal}
-            title={neonConfig.isConnected ? 'Neon DB Terhubung' : 'Konfigurasi Neon DB & Vercel'}
-            className={`p-1.5 rounded-md border text-xs transition cursor-pointer ${
-              neonConfig.isConnected
-                ? 'bg-cyan-50 border-cyan-300 text-cyan-700 hover:bg-cyan-100'
-                : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Database className="w-4 h-4" />
-          </button>
+          
 
           {isAdmin && (
             <button
@@ -845,11 +982,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         </div>
       </div>
 
-      {/* Kantong (kategori): jatah uang tiap kategori, klik untuk melihat detailnya di tab Filter */}
+      {/* Kantong: pos alokasi anggaran, klik untuk melihat detailnya di tab Filter */}
       {pockets.length > 0 && (
         <div className="space-y-1.5">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide px-0.5">
-            Kantong
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+              Kantong
+            </span>
+            
           </div>
           <div className="grid grid-cols-2 gap-2.5">
             {pockets.map(p => (
@@ -857,20 +997,17 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 key={p.key}
                 type="button"
                 onClick={() => {
-                  onFilterChange({ category: p.key });
+                  onFilterChange({ kantong: p.key, category: 'ALL' });
                   setActiveTab('filter');
                 }}
                 className="text-left bg-white rounded-xl border border-slate-200/90 p-3 shadow-xs hover:border-[#1e3a5f]/40 hover:shadow-sm active:scale-[0.96] active:bg-slate-100 active:border-[#1e3a5f] active:shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a5f]/40 transition duration-150 cursor-pointer select-none [-webkit-tap-highlight-color:transparent]"
               >
-                <div className="text-[11px] font-medium text-slate-500 leading-tight">{p.label}</div>
+                <div className="text-[11px] font-medium text-slate-500 leading-tight truncate">{p.label}</div>
                 <div className={`text-sm font-bold tracking-tight mt-0.5 ${p.saldo < 0 ? 'text-rose-700' : 'text-slate-800'}`}>
                   {p.saldo < 0 ? '-' : ''}{formatRupiah(Math.abs(p.saldo))}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5 leading-snug break-words">
                   +{formatRupiah(p.masuk)} · -{formatRupiah(p.keluar)}
-                  {p.pindah !== 0 && (
-                    <> · pindah {p.pindah > 0 ? '+' : '-'}{formatRupiah(Math.abs(p.pindah))}</>
-                  )}
                 </div>
               </button>
             ))}
@@ -1038,12 +1175,12 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             {/* Keterangan */}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Keterangan
+                Nama / Judul
               </label>
               <input
                 type="text"
                 required
-                value={keterangan}
+                value={Keterangan}
                 onChange={(e) => setKeterangan(e.target.value)}
                 placeholder="mis. Pemasukan Toko"
                 className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition"
@@ -1068,7 +1205,141 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             {/* Kantong */}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Kantong
+                Kantong <span className="text-slate-400 font-normal">(Pos Anggaran)</span>
+              </label>
+
+              <select
+                value={kantong}
+                onChange={(e) => {
+                  if (e.target.value === '__NEW__') {
+                    setIsAddingNewKantong(true);
+                    setIsManagingKantong(false);
+                  } else if (e.target.value === '__MANAGE__') {
+                    setIsManagingKantong(true);
+                    setIsAddingNewKantong(false);
+                  } else if (e.target.value === '__LOCKED_MANAGE__') {
+                    onOpenAdminModal();
+                  } else {
+                    setKantong(e.target.value);
+                  }
+                }}
+                className="w-full bg-white text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer"
+              >
+                <option value="">— Pilih Kantong —</option>
+                {allKantong.map(kt => (
+                  <option key={kt} value={kt}>
+                    {kt}
+                  </option>
+                ))}
+                <option disabled>──────────</option>
+                <option value="__NEW__" className="font-bold text-[#1e3a5f]">
+                  + Tambah Kantong Baru
+                </option>
+                {isAdmin && (
+                  <option value="__MANAGE__" className="font-bold text-rose-600">
+                    - Hapus Kantong (Admin)
+                  </option>
+                )}
+              </select>
+
+              {/* Inline input for adding a new kantong */}
+              {isAddingNewKantong && (
+                <div className="mt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 animate-in fade-in space-y-1.5">
+                  <div className="text-[11px] font-bold text-slate-700">
+                    + Tambah Kantong Baru:
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={newKantongInput}
+                      onChange={(e) => setNewKantongInput(e.target.value)}
+                      placeholder="Nama kantong baru (mis. Belanja, Pokok, dll)..."
+                      className="flex-1 bg-white text-xs rounded-md px-2.5 py-1.5 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveNewKantong();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveNewKantong}
+                      disabled={!newKantongInput.trim()}
+                      className="px-3 py-1.5 rounded-md bg-[#1e3a5f] hover:bg-[#162c47] text-white text-xs font-bold transition disabled:opacity-40 cursor-pointer"
+                    >
+                      Simpan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingNewKantong(false);
+                        setNewKantongInput('');
+                      }}
+                      className="px-2 py-1.5 rounded-md text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Inline panel for managing / deleting kantong */}
+              {isManagingKantong && (
+                <div className="mt-2 bg-rose-50/60 p-2.5 rounded-lg border border-rose-200 animate-in fade-in space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span>- Hapus Kantong</span>
+                      </div>
+                      <p className="text-[10px] sm:text-[11px] text-slate-500">
+                        Klik tombol hapus pada kantong yang ingin dihilangkan.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsManagingKantong(false)}
+                      className="px-2.5 py-1 rounded bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-bold border border-slate-300 shadow-2xs cursor-pointer"
+                    >
+                      Selesai
+                    </button>
+                  </div>
+
+                  {/* List of kantongs with delete buttons */}
+                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1 divide-y divide-rose-100">
+                    {allKantong.length === 0 ? (
+                      <div className="text-center py-2 text-slate-400 text-xs">
+                        Belum ada kantong tersimpan.
+                      </div>
+                    ) : (
+                      allKantong.map(kt => (
+                        <div key={kt} className="flex items-center justify-between pt-1.5 first:pt-0">
+                          <span className="text-xs font-medium text-slate-800 bg-white px-2 py-1 rounded border border-slate-200 shadow-2xs">
+                            {kt}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteKantong(kt)}
+                            className="px-2 py-1 rounded-md text-rose-600 hover:text-rose-800 hover:bg-rose-100 transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                            title={`Hapus kantong "${kt}"`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Kategori */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Kategori
               </label>
 
               <select
@@ -1089,7 +1360,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 }}
                 className="w-full bg-white text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition cursor-pointer"
               >
-                <option value="" disabled>— Pilih Kantong —</option>
+                <option value="" disabled>— Pilih Kategori —</option>
                 {allCategories.map(cat => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -1097,27 +1368,27 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 ))}
                 <option disabled>──────────</option>
                 <option value="__NEW__" className="font-bold text-[#1e3a5f]">
-                  +Tambah Kantong
+                  + Tambah Kategori Baru
                 </option>
                 {isAdmin && (
                   <option value="__MANAGE__" className="font-bold text-rose-600">
-                    -Hapus Kantong (Admin)
+                    - Hapus Kategori (Admin)
                   </option>
                 )}
               </select>
 
-              {/* Inline input for adding a new category/pocket */}
+              {/* Inline input for adding a new category */}
               {isAddingNewCategory && (
                 <div className="mt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 animate-in fade-in space-y-1.5">
                   <div className="text-[11px] font-bold text-slate-700">
-                    + Tambah Kantong Baru:
+                    + Tambah Kategori Baru:
                   </div>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="text"
                       value={newCategoryInput}
                       onChange={(e) => setNewCategoryInput(e.target.value)}
-                      placeholder="Nama kantong baru..."
+                      placeholder="Nama kategori baru..."
                       className="flex-1 bg-white text-xs rounded-md px-2.5 py-1.5 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                       autoFocus
                       onKeyDown={(e) => {
@@ -1156,10 +1427,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     <div>
                       <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                        <span>- Hapus Kantong</span>
+                        <span>- Hapus Kategori</span>
                       </div>
                       <p className="text-[10px] sm:text-[11px] text-slate-500">
-                        Klik tombol hapus pada kantong yang ingin dihilangkan.
+                        Klik tombol hapus pada kategori yang ingin dihilangkan.
                       </p>
                     </div>
                     <button
@@ -1175,7 +1446,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   <div className="max-h-40 overflow-y-auto space-y-1 pr-1 divide-y divide-rose-100">
                     {allCategories.length === 0 ? (
                       <div className="text-center py-2 text-slate-400 text-xs">
-                        Belum ada kantong tersimpan.
+                        Belum ada kategori tersimpan.
                       </div>
                     ) : (
                       allCategories.map(cat => (
@@ -1200,6 +1471,20 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               )}
             </div>
 
+            {/* Catatan (opsional) */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Catatan <span className="text-slate-400 font-normal">(opsional)</span>
+              </label>
+              <input
+                type="text"
+                value={catatan}
+                onChange={(e) => setCatatan(e.target.value)}
+                placeholder="mis. No nota, beli di toko X, atau catatan tambahan"
+                className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] transition"
+              />
+            </div>
+
             {/* Tombol SIMPAN */}
             <button
               type="submit"
@@ -1210,16 +1495,20 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
           </form>
         )}
 
-        {/* TAB 2: PINDAH (antar akun / antar kategori) */}
+        {/* TAB 2: PINDAH (antar akun / antar kantong / antar kategori) */}
         {activeTab === 'pindah' && (
           <div className="space-y-3.5">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <button
                 type="button"
-                onClick={() => setPindahMode('akun')}
-                className={`py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                onClick={() => {
+                  setPindahMode('akun');
+                  setKtDari('');
+                  setKtKe('');
+                }}
+                className={`py-1.5 px-1 rounded-lg text-xs font-bold border transition cursor-pointer text-center ${
                   pindahMode === 'akun'
-                    ? 'bg-slate-800 text-white border-slate-800'
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -1227,10 +1516,29 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setPindahMode('kategori')}
-                className={`py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                onClick={() => {
+                  setPindahMode('kantong');
+                  setKtDari('');
+                  setKtKe('');
+                }}
+                className={`py-1.5 px-1 rounded-lg text-xs font-bold border transition cursor-pointer text-center ${
+                  pindahMode === 'kantong'
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                Antar Kantong
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPindahMode('kategori');
+                  setKtDari('');
+                  setKtKe('');
+                }}
+                className={`py-1.5 px-1 rounded-lg text-xs font-bold border transition cursor-pointer text-center ${
                   pindahMode === 'kategori'
-                    ? 'bg-slate-800 text-white border-slate-800'
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -1238,10 +1546,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               </button>
             </div>
 
-            {pindahMode === 'kategori' ? (
-              <form onSubmit={handlePindahKategori} className="space-y-3.5">
+            {pindahMode === 'kantong' && (
+              <form onSubmit={handlePindahKantong} className="space-y-3.5">
                 <p className="text-[11px] text-slate-500">
-                  Pindahkan jatah uang antar kategori, mis. diambil dari Toko untuk Pokok. Saldo akun tidak berubah.
+                  Pindahkan jatah uang antar kantong pos anggaran (mis. diambil dari Toko untuk Pokok). Saldo total akun tidak berubah.
                 </p>
 
                 {/* Tanggal */}
@@ -1260,19 +1568,19 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   </div>
                 </div>
 
-                {/* Diambil dari kategori */}
+                {/* Diambil dari Kantong */}
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Diambil dari kategori
+                    Diambil dari Kantong
                   </label>
                   <select
                     value={ktDari}
                     onChange={(e) => setKtDari(e.target.value)}
                     className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                   >
-                    <option value="">— pilih kategori —</option>
-                    {allCategories.filter(c => c !== 'Pindah Saldo').map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    <option value="">— pilih kantong asal —</option>
+                    {allKantong.map(k => (
+                      <option key={k} value={k}>{k}</option>
                     ))}
                   </select>
                   {ktDari && (
@@ -1282,19 +1590,19 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   )}
                 </div>
 
-                {/* Untuk kategori */}
+                {/* Untuk Kantong */}
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Untuk kategori
+                    Untuk Kantong
                   </label>
                   <select
                     value={ktKe}
                     onChange={(e) => setKtKe(e.target.value)}
                     className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                   >
-                    <option value="">— pilih kategori —</option>
-                    {allCategories.filter(c => c !== 'Pindah Saldo' && c !== ktDari).map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    <option value="">— pilih kantong tujuan —</option>
+                    {allKantong.filter(k => k !== ktDari).map(k => (
+                      <option key={k} value={k}>{k}</option>
                     ))}
                   </select>
                   {ktKe && (
@@ -1344,7 +1652,128 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     type="text"
                     value={ktKeterangan}
                     onChange={(e) => setKtKeterangan(e.target.value)}
-                    placeholder="mis. Jatah bulanan"
+                    placeholder="mis. Jatah belanja pokok"
+                    className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] transition"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!ktDari || !ktKe || parseRupiahInput(ktNominalStr) <= 0}
+                  className="w-full py-2.5 rounded-lg bg-[#1e3a5f] hover:bg-[#162c47] disabled:opacity-40 text-white font-bold text-sm tracking-wide shadow-sm transition active:scale-[0.99] cursor-pointer"
+                >
+                  PINDAH KANTONG
+                </button>
+              </form>
+            )}
+
+            {pindahMode === 'kategori' && (
+              <form onSubmit={handlePindahKategori} className="space-y-3.5">
+                <p className="text-[11px] text-slate-500">
+                  Pindahkan alokasi antar kategori pengeluaran/pemasukan. Saldo total akun tidak berubah.
+                </p>
+
+                {/* Tanggal */}
+                <div className="w-full min-w-0">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Tanggal
+                  </label>
+                  <div className="relative w-full min-w-0">
+                    <input
+                      type="date"
+                      value={tanggal}
+                      onChange={(e) => setTanggal(e.target.value)}
+                      className="block w-full max-w-full box-border bg-white text-slate-800 text-xs sm:text-sm rounded-lg pl-3 pr-10 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] transition cursor-pointer"
+                    />
+                    <Calendar className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Diambil dari kategori */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Diambil dari kategori
+                  </label>
+                  <select
+                    value={ktDari}
+                    onChange={(e) => setKtDari(e.target.value)}
+                    className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  >
+                    <option value="">— pilih kategori asal —</option>
+                    {allCategories.filter(c => c !== 'Pindah Saldo' && c !== 'Pindah Kantong').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  {ktDari && (
+                    <p className={`text-[11px] mt-1 ${categoryBalance(ktDari) < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+                      Saldo kategori {ktDari}: {categoryBalance(ktDari) < 0 ? '-' : ''}{formatRupiah(Math.abs(categoryBalance(ktDari)))}
+                    </p>
+                  )}
+                </div>
+
+                {/* Untuk kategori */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Untuk kategori
+                  </label>
+                  <select
+                    value={ktKe}
+                    onChange={(e) => setKtKe(e.target.value)}
+                    className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  >
+                    <option value="">— pilih kategori tujuan —</option>
+                    {allCategories.filter(c => c !== 'Pindah Saldo' && c !== 'Pindah Kantong' && c !== ktDari).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  {ktKe && (
+                    <p className={`text-[11px] mt-1 ${categoryBalance(ktKe) < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+                      Saldo kategori {ktKe}: {categoryBalance(ktKe) < 0 ? '-' : ''}{formatRupiah(Math.abs(categoryBalance(ktKe)))}
+                    </p>
+                  )}
+                </div>
+
+                {/* Dicatat di akun */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Dicatat di akun
+                  </label>
+                  <select
+                    value={ktAkunId}
+                    onChange={(e) => setKtAkun(e.target.value)}
+                    className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  >
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Nominal */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Nominal (Rp)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={ktNominalStr}
+                    onChange={handleKtNominalChange}
+                    placeholder="0"
+                    className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] font-mono transition"
+                  />
+                </div>
+
+                {/* Keterangan */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Keterangan (opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={ktKeterangan}
+                    onChange={(e) => setKtKeterangan(e.target.value)}
+                    placeholder="mis. Pindah alokasi bulanan"
                     className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-lg px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] transition"
                   />
                 </div>
@@ -1357,7 +1786,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   PINDAH KATEGORI
                 </button>
               </form>
-            ) : (
+            )}
+
+            {pindahMode === 'akun' && (
               <form onSubmit={handlePindahSaldo} className="space-y-3.5">
                 
                 {/* Tanggal */}
@@ -1562,6 +1993,41 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               </div>
             </div>
 
+            {/* Filter Kantong */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700">
+                  Filter Kantong (Pos Anggaran):
+                </label>
+                {filter.kantong && filter.kantong !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => onFilterChange({ kantong: 'ALL' })}
+                    className="text-[11px] text-[#1e3a5f] hover:underline font-bold cursor-pointer"
+                  >
+                    Tampilkan Semua Kantong
+                  </button>
+                )}
+              </div>
+              <select
+                value={filter.kantong || 'ALL'}
+                onChange={(e) => onFilterChange({ kantong: e.target.value })}
+                className={`w-full rounded-lg p-2 border font-medium focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] transition cursor-pointer ${
+                  filter.kantong && filter.kantong !== 'ALL' 
+                    ? 'bg-purple-50/60 border-purple-400 text-slate-900 font-semibold' 
+                    : 'bg-white border-slate-300 text-slate-800'
+                }`}
+              >
+                <option value="ALL">Semua Kantong (Semua Pos Anggaran)</option>
+                <option value="EMPTY">— Tanpa Kantong —</option>
+                {allKantong.map(kt => (
+                  <option key={kt} value={kt}>
+                    {kt}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Filter Kategori */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -1572,7 +2038,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onFilterChange({ category: 'ALL' })}
-                    className="text-[11px] text-[#1e3a5f] hover:underline font-bold"
+                    className="text-[11px] text-[#1e3a5f] hover:underline font-bold cursor-pointer"
                   >
                     Tampilkan Semua Kategori
                   </button>
@@ -1581,7 +2047,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               <select
                 value={filter.category}
                 onChange={(e) => onFilterChange({ category: e.target.value })}
-                className={`w-full rounded-lg p-2 border font-medium focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] transition ${
+                className={`w-full rounded-lg p-2 border font-medium focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] transition cursor-pointer ${
                   filter.category !== 'ALL' 
                     ? 'bg-amber-50/60 border-amber-400 text-slate-900 font-semibold' 
                     : 'bg-white border-slate-300 text-slate-800'
@@ -1606,7 +2072,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 <select
                   value={filter.accountId}
                   onChange={(e) => onFilterChange({ accountId: e.target.value })}
-                  className="w-full bg-white text-slate-800 rounded-lg p-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  className="w-full bg-white text-slate-800 rounded-lg p-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] cursor-pointer"
                 >
                   <option value="ALL">Semua Akun</option>
                   {accounts.map(a => (
@@ -1622,7 +2088,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 <select
                   value={filter.type}
                   onChange={(e) => onFilterChange({ type: e.target.value as any })}
-                  className="w-full bg-white text-slate-800 rounded-lg p-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  className="w-full bg-white text-slate-800 rounded-lg p-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] cursor-pointer"
                 >
                   <option value="ALL">Semua Jenis</option>
                   <option value="masuk">Masuk Saja</option>
@@ -1634,7 +2100,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
             {/* Search */}
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Cari Keterangan:
+                Cari Nama / Judul / Catatan:
               </label>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -1642,7 +2108,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   type="text"
                   value={filter.searchQuery}
                   onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
-                  placeholder="Cari kata (e.g. bensin, semen, wifi)..."
+                  placeholder="Cari kata (e.g. bensin, semen, nota, toko)..."
                   className="w-full bg-white text-slate-800 rounded-lg pl-8 pr-3 py-1.5 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                 />
               </div>
@@ -1650,11 +2116,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
             {/* Period Summary Result */}
             {(() => {
-              // Pindah saldo tidak dihitung. Pindah kategori hanya dihitung saat satu kategori dipilih
-              // (karena itu pemasukan/pengeluaran kantong tersebut).
               const counted = filteredList.filter(t => {
                 if (t.category === 'Pindah Saldo') return filter.category === 'Pindah Saldo';
-                if (isCatTransfer(t)) return filter.category !== 'ALL';
+                if (isCatTransfer(t)) return filter.category !== 'ALL' || filter.kantong !== 'ALL';
                 return true;
               });
               const totalMasuk = counted.filter(t => t.type === 'masuk').reduce((sum, t) => sum + t.amount, 0);
@@ -1668,9 +2132,18 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     <span className="font-bold text-slate-800">{filteredList.length} transaksi</span>
                   </div>
                   
+                  {filter.kantong && filter.kantong !== 'ALL' && (
+                    <div className="flex items-center justify-between text-purple-900 font-bold bg-purple-50 px-2 py-1 rounded-md border border-purple-200">
+                      <span>Saldo Kantong "{filter.kantong === 'EMPTY' ? 'Tanpa Kantong' : filter.kantong}":</span>
+                      <span>
+                        {sisa < 0 ? '-' : ''}{formatRupiah(Math.abs(sisa))}
+                      </span>
+                    </div>
+                  )}
+
                   {filter.category !== 'ALL' && (
                     <div className="flex items-center justify-between text-amber-900 font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
-                      <span>Saldo Kantong "{filter.category === 'EMPTY' ? 'Tanpa Kategori' : filter.category}":</span>
+                      <span>Total Kategori "{filter.category === 'EMPTY' ? 'Tanpa Kategori' : filter.category}":</span>
                       <span>
                         {sisa < 0 ? '-' : ''}{formatRupiah(Math.abs(sisa))}
                       </span>
@@ -1699,8 +2172,9 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               );
             })()}
 
-            {/* Rekap per Kantong & per Akun (klik baris untuk memfilter) */}
-            {renderRecap('Rekap per Kantong (kategori)', categoryRecap, filter.category, key => onFilterChange({ category: key }), 'Pindah kategori')}
+            {/* Rekap per Kantong, Rekap per Kategori & Rekap per Akun (klik baris untuk memfilter) */}
+            {renderRecap('Rekap per Kantong', kantongRecap, filter.kantong, key => onFilterChange({ kantong: key }), 'Pindah')}
+            {renderRecap('Rekap per Kategori', categoryRecap, filter.category, key => onFilterChange({ category: key }), 'Pindah')}
             {renderRecap('Rekap per Akun', accountRecap, filter.accountId, key => onFilterChange({ accountId: key }), 'Pindah saldo')}
 
             {/* Filtered list preview (Full, no text truncation) */}
@@ -1728,13 +2202,25 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                         <span className={`font-medium ${t.type === 'masuk' ? 'text-emerald-700' : 'text-rose-700'}`}>
                           {t.type === 'masuk' ? 'Masuk' : 'Keluar'}
                         </span>
-                        <span>•</span>
-                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
-                          {t.category || 'Tanpa Kategori'}
-                        </span>
+                        {t.kantong && t.kantong !== '-' && (
+                          <>
+                            <span>•</span>
+                            <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
+                              {t.kantong}
+                            </span>
+                          </>
+                        )}
+                        {t.category && t.category !== '-' && (
+                          <>
+                            <span>•</span>
+                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                              {t.category}
+                            </span>
+                          </>
+                        )}
                         {isCatTransfer(t) && (
                           <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
-                            Pindah kategori
+                            Pindah jatah
                           </span>
                         )}
                         {(t.notes || t.catatan) && (
@@ -1916,6 +2402,14 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     <span className={`font-medium ${isMasuk ? 'text-emerald-700' : 'text-rose-700'}`}>
                       {isMasuk ? 'Masuk' : 'Keluar'}
                     </span>
+                    {tx.kantong && tx.kantong !== '-' && (
+                      <>
+                        <span>•</span>
+                        <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
+                          {tx.kantong}
+                        </span>
+                      </>
+                    )}
                     {tx.category && tx.category !== '-' && (
                       <>
                         <span>•</span>
@@ -1926,7 +2420,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                     )}
                     {isCatTransfer(tx) && (
                       <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
-                        Pindah kategori
+                        Pindah jatah
                       </span>
                     )}
                     {(tx.notes || tx.catatan) && (
@@ -2071,7 +2565,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               {/* Keterangan */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Keterangan
+                  Nama / Judul
                 </label>
                 <input
                   type="text"
@@ -2105,12 +2599,29 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                   Kantong
                 </label>
                 <select
+                  value={editKantong}
+                  onChange={(e) => setEditKantong(e.target.value)}
+                  className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-xl px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                >
+                  <option value="">— Tanpa Kantong —</option>
+                  {allKantong.map(kt => (
+                    <option key={kt} value={kt}>{kt}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Kategori */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Kategori
+                </label>
+                <select
                   required
                   value={editKategori}
                   onChange={(e) => setEditKategori(e.target.value)}
                   className="w-full bg-white text-slate-800 text-xs sm:text-sm rounded-xl px-3 py-2 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                 >
-                  <option value="" disabled>— Pilih Kantong —</option>
+                  <option value="" disabled>— Pilih Kategori —</option>
                   {allCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
