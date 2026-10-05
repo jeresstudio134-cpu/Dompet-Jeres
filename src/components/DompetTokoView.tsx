@@ -222,7 +222,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
   const handleKtNominalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, '');
-    setKtNominalStr(raw ? parseInt(raw, 10).toLocaleString('id-ID') : '0');
+    setKtNominalStr(raw ? parseInt(raw, 10).toLocaleString('id-ID') : '');
   };
 
   // Submit 'Catat'
@@ -274,7 +274,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
     if (ok === false) return;
     confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
-    setTransferNominalStr('0');
+    setTransferNominalStr('');
     setTransferKeterangan('');
   };
 
@@ -340,7 +340,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     if (!ok) return;
 
     confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
-    setKtNominalStr('0');
+    setKtNominalStr('');
     setKtKeterangan('');
   };
 
@@ -579,7 +579,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     const totalKeluar = counted.filter(t => t.type === 'keluar').reduce((sum, t) => sum + t.amount, 0);
     const sisa = totalMasuk - totalKeluar;
 
-    const periodeLabel = filter.monthYear === 'ALL' ? 'Semua Periode' : filter.monthYear;
+    const periodeLabel =
+      filter.monthYear === 'ALL'
+        ? 'Semua Periode'
+        : monthOptions.find(o => o.value === filter.monthYear)?.label || filter.monthYear;
     const rentangLabel =
       filter.dateFrom || filter.dateTo
         ? `${filter.dateFrom ? formatTanggalIndo(filter.dateFrom) : 'Awal'} s/d ${
