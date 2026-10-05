@@ -14,38 +14,156 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function isMobileDevice(): boolean {
+  const ua = navigator.userAgent || '';
+  const iPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || iPadOS;
+}
+
 /**
- * Membuka laporan di tab baru lalu mencetaknya. Cara ini bekerja di komputer dan di iPhone
- * (cetak lewat iframe tersembunyi tidak berfungsi di Safari iPhone).
+ * KOMPUTER: mencetak lewat iframe tersembunyi lalu mengembalikan judul dokumen (fungsi lama).
  */
-export function printHtml(html: string, title: string): void {
-  // Judul disisipkan aman ke dalam script (tanda "<" dilarikan agar tidak menutup tag script)
-  const safeTitle = JSON.stringify(title).replace(/</g, '\\u003c');
+function printViaIframe(html: string, title: string): void {
+  const originalTitle = document.title;
+  document.title = title;
 
-  const toolbar = `
-    <div class="no-print" style="position:fixed;top:10px;right:10px;z-index:9;font-family:Arial,sans-serif">
-      <button onclick="window.print()" style="padding:10px 16px;border:1px solid #333;background:#111;color:#fff;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer">Cetak / Simpan PDF</button>
-    </div>
-    <style>@media print { .no-print { display: none !important; } }</style>
-    <script>
-      document.title = ${safeTitle};
-      window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 500); });
-    </script>`;
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
 
-  let doc = html.includes('</body>') ? html.replace('</body>', () => toolbar + '</body>') : html + toolbar;
+  document.body.appendChild(iframe);
 
-  // Lebar halaman A4 (794px) supaya tata letaknya sama di HP dan di komputer
-  if (doc.includes('<head>')) {
-    doc = doc.replace('<head>', () => '<head><meta name="viewport" content="width=794, initial-scale=1">');
-  }
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    document.title = originalTitle;
+    if (iframe.parentNode) {
+      iframe.parentNode.removeChild(iframe);
+    }
+  };
 
-  const url = URL.createObjectURL(new Blob([doc], { type: 'text/html;charset=utf-8' }));
-  const reportWindow = window.open(url, '_blank');
+  // Cadangan timeout 2 menit
+  const timeoutId = setTimeout(cleanup, 120000);
 
-  if (!reportWindow) {
-    URL.revokeObjectURL(url);
-    alert('Pop-up diblokir browser. Izinkan pop-up untuk situs ini, lalu coba lagi.');
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (!doc) {
+    clearTimeout(timeoutId);
+    cleanup();
     return;
   }
-  setTimeout(() => URL.revokeObjectURL(url), 300000);
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Tunggu sekitar 300 ms, lalu memanggil print() pada iframe
+  setTimeout(() => {
+    try {
+      const win = iframe.contentWindow;
+      if (win) {
+        win.onafterprint = () => {
+          clearTimeout(timeoutId);
+          cleanup();
+        };
+        win.focus();
+        win.print();
+      } else {
+        clearTimeout(timeoutId);
+        cleanup();
+      }
+    } catch {
+      clearTimeout(timeoutId);
+      cleanup();
+    }
+  }, 300);
+}
+
+/**
+ * HP / TABLET: laporan dimasukkan sementara ke halaman ini, aplikasi disembunyikan saat cetak,
+ * lalu window.print() dipanggil. Safari iPhone tidak bisa mencetak iframe (yang tercetak malah
+ * halaman aplikasi), dan tidak memerlukan pop-up.
+ */
+function printInPage(html: string, title: string): void {
+  // Buang sisa cetak sebelumnya (kalau ada)
+  document.getElementById('print-root')?.remove();
+  document.getElementById('print-style')?.remove();
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+
+  // Aturan "body" milik laporan dipindahkan ke #print-root agar tidak memengaruhi aplikasi
+  const reportCss = Array.from(parsed.querySelectorAll('style'))
+    .map(s => s.textContent || '')
+    .join('\n')
+    .replace(/(^|[}\s])body(\s*\{)/g, '$1#print-root$2');
+
+  const style = document.createElement('style');
+  style.id = 'print-style';
+  style.textContent = `
+    #print-root { display: none; }
+    @media print {
+      body > *:not(#print-root) { display: none !important; }
+      html, body {
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+      }
+      #print-root { display: block !important; }
+      ${reportCss}
+    }
+  `;
+
+  const root = document.createElement('div');
+  root.id = 'print-root';
+  root.innerHTML = parsed.body.innerHTML;
+
+  document.head.appendChild(style);
+  document.body.appendChild(root);
+
+  // Judul dokumen dipakai sebagai nama file saat "Simpan PDF"
+  const originalTitle = document.title;
+  document.title = title;
+
+  let done = false;
+  const cleanup = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('pointerdown', cleanup, true);
+    document.title = originalTitle;
+    style.remove();
+    root.remove();
+  };
+
+  // Dibersihkan saat layar disentuh lagi setelah dialog cetak ditutup, atau setelah 5 menit.
+  // (Tidak dibersihkan lebih awal karena iPhone menyusun ulang pratinjau saat ukuran kertas diubah.)
+  window.addEventListener('pointerdown', cleanup, true);
+  setTimeout(cleanup, 300000);
+
+  setTimeout(() => {
+    try {
+      window.print();
+    } catch {
+      cleanup();
+    }
+  }, 300);
+}
+
+/**
+ * Mencetak laporan HTML. Komputer memakai iframe, HP memakai cetak langsung di halaman.
+ */
+export function printHtml(html: string, title: string): void {
+  if (isMobileDevice()) {
+    printInPage(html, title);
+  } else {
+    printViaIframe(html, title);
+  }
 }
