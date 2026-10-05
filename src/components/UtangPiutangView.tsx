@@ -282,21 +282,21 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
 
         return `
         <div style="margin-bottom: 14px; page-break-inside: avoid;">
-          <div style="background-color: #f1f3f5; border: 1px solid #ccc; border-bottom: none; padding: 5px 8px; font-weight: bold; font-size: 11px; display: flex; justify-content: space-between;">
+          <div style="background-color: #f1f3f5; border: 1px solid #bbb; border-bottom: none; padding: 5px 8px; font-weight: bold; font-size: 11px; display: flex; justify-content: space-between;">
             <span>Kelompok Pihak: ${escapeHtml(partyName)} (${items.length} transaksi)</span>
             <span style="font-size: 10px; color: #333;">Subtotal Sisa: ${formatRupiah(partySisa)}</span>
           </div>
           <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
             <thead>
               <tr style="background-color: #f8f9fa; color: #222;">
-                <th style="border: 1px solid #ccc; padding: 3px 5px; width: 26px; text-align: center;">No</th>
-                <th style="border: 1px solid #ccc; padding: 3px 5px; text-align: left;">Keterangan</th>
-                <th style="border: 1px solid #ccc; padding: 3px 5px; width: 75px; text-align: left;">Tanggal</th>
-                ${hasDueDate ? '<th style="border: 1px solid #ccc; padding: 3px 5px; width: 75px; text-align: left;">Jatuh Tempo</th>' : ''}
-                <th style="border: 1px solid #ccc; padding: 3px 5px; width: 90px; text-align: right;">Total Pokok</th>
-                <th style="border: 1px solid #ccc; padding: 3px 5px; width: 90px; text-align: right;">${escapeHtml(paidLabel)}</th>
-                <th style="border: 1px solid #ccc; padding: 3px 5px; width: 90px; text-align: right;">Sisa</th>
-                <th style="border: 1px solid #ccc; padding: 3px 5px; width: 50px; text-align: center;">Status</th>
+                <th style="border: 1px solid #bbb; padding: 4px 5px; width: 5%; text-align: center;">No</th>
+                <th style="border: 1px solid #bbb; padding: 4px 6px; width: ${hasDueDate ? '25%' : '37%'}; text-align: left;">Keterangan</th>
+                <th style="border: 1px solid #bbb; padding: 4px 6px; width: 13%; text-align: left;">Tanggal</th>
+                ${hasDueDate ? '<th style="border: 1px solid #bbb; padding: 4px 6px; width: 12%; text-align: left;">Jatuh Tempo</th>' : ''}
+                <th style="border: 1px solid #bbb; padding: 4px 6px; width: 14%; text-align: right;">Total Pokok</th>
+                <th style="border: 1px solid #bbb; padding: 4px 6px; width: 14%; text-align: right;">${escapeHtml(paidLabel)}</th>
+                <th style="border: 1px solid #bbb; padding: 4px 6px; width: 14%; text-align: right;">Sisa</th>
+                <th style="border: 1px solid #bbb; padding: 4px 5px; width: 8%; text-align: center;">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -306,14 +306,14 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                   const sisa = getSisa(d);
                   return `
                   <tr>
-                    <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: center;">${idx + 1}</td>
-                    <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(d.name)}</td>
-                    <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(formatTanggalIndo(d.startDate))}</td>
-                    ${hasDueDate ? `<td style="border: 1px solid #ccc; padding: 3px 5px;">${d.dueDate ? escapeHtml(formatTanggalIndo(d.dueDate)) : '-'}</td>` : ''}
-                    <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(d.totalAmount)}</td>
-                    <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(paid)}</td>
-                    <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums; font-weight: bold;">${formatRupiah(sisa)}</td>
-                    <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: center;">${isLunas(d) ? 'Lunas' : 'Aktif'}</td>
+                    <td style="border: 1px solid #bbb; padding: 4px 5px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #bbb; padding: 4px 6px;">${escapeHtml(d.name)}</td>
+                    <td style="border: 1px solid #bbb; padding: 4px 6px;">${escapeHtml(formatTanggalIndo(d.startDate))}</td>
+                    ${hasDueDate ? `<td style="border: 1px solid #bbb; padding: 4px 6px;">${d.dueDate ? escapeHtml(formatTanggalIndo(d.dueDate)) : '-'}</td>` : ''}
+                    <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(d.totalAmount)}</td>
+                    <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(paid)}</td>
+                    <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums; font-weight: bold;">${formatRupiah(sisa)}</td>
+                    <td style="border: 1px solid #bbb; padding: 4px 5px; text-align: center;">${isLunas(d) ? 'Lunas' : 'Aktif'}</td>
                   </tr>
                 `;
                 })
@@ -321,11 +321,11 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
             </tbody>
             <tfoot>
               <tr style="background-color: #fafafa; font-weight: bold;">
-                <td colspan="${hasDueDate ? 3 : 2}" style="border: 1px solid #ccc; padding: 4px 5px; text-align: right;">Subtotal ${escapeHtml(partyName)}:</td>
-                <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(partyPokok)}</td>
-                <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(partyDibayar)}</td>
-                <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(partySisa)}</td>
-                <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: center;">-</td>
+                <td colspan="${hasDueDate ? 4 : 3}" style="border: 1px solid #bbb; padding: 4px 6px; text-align: right;">Subtotal ${escapeHtml(partyName)}:</td>
+                <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(partyPokok)}</td>
+                <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(partyDibayar)}</td>
+                <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(partySisa)}</td>
+                <td style="border: 1px solid #bbb; padding: 4px 5px; text-align: center;">-</td>
               </tr>
             </tfoot>
           </table>
@@ -333,7 +333,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
           ${
             itemsWithPayments.length > 0
               ? `
-            <div style="margin-top: 4px; padding: 4px 6px; background: #fafafa; border: 1px solid #e0e0e0; font-size: 8.5px;">
+            <div style="margin-top: 4px; padding: 5px 8px; background: #fafafa; border: 1px solid #ccc; font-size: 8.5px;">
               <div style="font-weight: bold; margin-bottom: 2px; color: #444;">Riwayat Angsuran (${escapeHtml(partyName)}):</div>
               ${itemsWithPayments
                 .map(
@@ -369,7 +369,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   <style>
     @page {
       size: A4 portrait;
-      margin: 14mm 12mm 16mm 12mm;
+      margin: 14mm 10mm 16mm 10mm;
       @bottom-right {
         content: "Hal. " counter(page) " / " counter(pages);
         font-family: Arial, Helvetica, sans-serif;
@@ -389,7 +389,8 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
       color: #000;
       background: #fff;
       margin: 0;
-      padding: 0;
+      padding: 0 2mm;
+      width: 100%;
     }
     thead { display: table-header-group; }
     tfoot { display: table-row-group; }
@@ -441,10 +442,10 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   <!-- Grand Total Table -->
   <table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; margin-bottom: 14px;">
     <tr style="background-color: #e9ecef; font-weight: bold;">
-      <td style="border: 1.5px solid #333; padding: 6px 8px; text-align: right;">GRAND TOTAL ${escapeHtml(typeLabel).toUpperCase()}:</td>
-      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 110px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(totalPokok)}</td>
-      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 110px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(totalDibayar)}</td>
-      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 110px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(totalSisa)}</td>
+      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 50%; text-align: right;">GRAND TOTAL ${escapeHtml(typeLabel).toUpperCase()}:</td>
+      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 17%; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(totalPokok)}</td>
+      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 17%; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(totalDibayar)}</td>
+      <td style="border: 1.5px solid #333; padding: 6px 8px; width: 16%; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(totalSisa)}</td>
     </tr>
   </table>
 
@@ -489,7 +490,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
   <style>
     @page {
       size: A4 portrait;
-      margin: 14mm 12mm 16mm 12mm;
+      margin: 14mm 10mm 16mm 10mm;
       @bottom-right {
         content: "Hal. " counter(page) " / " counter(pages);
         font-family: Arial, Helvetica, sans-serif;
@@ -509,7 +510,8 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
       color: #000;
       background: #fff;
       margin: 0;
-      padding: 0;
+      padding: 0 2mm;
+      width: 100%;
     }
     thead { display: table-header-group; }
     tfoot { display: table-row-group; }
@@ -543,23 +545,23 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
     </div>
     <table style="width: 100%; font-size: 10.5px;">
       <tr>
-        <td style="width: 130px; color: #555; padding: 2px 0;">Pihak Bersangkutan:</td>
-        <td style="font-weight: bold; color: #111;">${escapeHtml(debt.counterparty || '-')}</td>
+        <td style="width: 160px; color: #555; padding: 2.5px 0;">Pihak Bersangkutan:</td>
+        <td style="font-weight: bold; color: #111; padding: 2.5px 0;">${escapeHtml(debt.counterparty || '-')}</td>
       </tr>
       <tr>
-        <td style="color: #555; padding: 2px 0;">Keterangan / Keperluan:</td>
-        <td style="font-weight: bold; color: #111;">${escapeHtml(debt.name)}</td>
+        <td style="color: #555; padding: 2.5px 0;">Keterangan / Keperluan:</td>
+        <td style="font-weight: bold; color: #111; padding: 2.5px 0;">${escapeHtml(debt.name)}</td>
       </tr>
       <tr>
-        <td style="color: #555; padding: 2px 0;">Tanggal Pinjam/Mulai:</td>
-        <td>${escapeHtml(formatTanggalIndo(debt.startDate))}</td>
+        <td style="color: #555; padding: 2.5px 0;">Tanggal Pinjam/Mulai:</td>
+        <td style="padding: 2.5px 0;">${escapeHtml(formatTanggalIndo(debt.startDate))}</td>
       </tr>
       ${
         debt.dueDate
           ? `
       <tr>
-        <td style="color: #555; padding: 2px 0;">Jatuh Tempo:</td>
-        <td>${escapeHtml(formatTanggalIndo(debt.dueDate))}</td>
+        <td style="color: #555; padding: 2.5px 0;">Jatuh Tempo:</td>
+        <td style="padding: 2.5px 0;">${escapeHtml(formatTanggalIndo(debt.dueDate))}</td>
       </tr>`
           : ''
       }
@@ -567,8 +569,8 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
         debt.installmentAmount
           ? `
       <tr>
-        <td style="color: #555; padding: 2px 0;">Cicilan per Bulan:</td>
-        <td>${formatRupiah(debt.installmentAmount)}</td>
+        <td style="color: #555; padding: 2.5px 0;">Cicilan per Bulan:</td>
+        <td style="padding: 2.5px 0;">${formatRupiah(debt.installmentAmount)}</td>
       </tr>`
           : ''
       }
@@ -576,34 +578,36 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
         debt.notes
           ? `
       <tr>
-        <td style="color: #555; padding: 2px 0;">Catatan Tambahan:</td>
-        <td>${escapeHtml(debt.notes)}</td>
+        <td style="color: #555; padding: 2.5px 0;">Catatan Tambahan:</td>
+        <td style="padding: 2.5px 0;">${escapeHtml(debt.notes)}</td>
       </tr>`
           : ''
       }
       <tr>
-        <td style="color: #555; padding: 2px 0;">Status Saat Ini:</td>
-        <td style="font-weight: bold;">${lunas ? 'LUNAS' : 'AKTIF / BELUM LUNAS'}</td>
+        <td style="color: #555; padding: 2.5px 0;">Status Saat Ini:</td>
+        <td style="font-weight: bold; padding: 2.5px 0;">${lunas ? 'LUNAS' : 'AKTIF / BELUM LUNAS'}</td>
       </tr>
     </table>
   </div>
 
-  <!-- Kartu Rekap Nominal 3 Kolom -->
-  <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 14px;">
+  <!-- Kartu Rekap Nominal 3 Kolom (Rata Kiri & Kanan Penuh) -->
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
     <tr>
-      <td style="width: 33.33%; border: 1px solid #bbb; border-radius: 4px; padding: 8px; background-color: #fafafa; text-align: center;">
+      <td style="width: 32%; border: 1px solid #bbb; border-radius: 4px; padding: 8px; background-color: #fafafa; text-align: center;">
         <div style="font-size: 9.5px; color: #555; text-transform: uppercase;">Total Pokok</div>
         <div style="font-size: 13px; font-weight: bold; margin-top: 3px; font-variant-numeric: tabular-nums;">
           ${formatRupiah(debt.totalAmount)}
         </div>
       </td>
-      <td style="width: 33.33%; border: 1px solid #bbb; border-radius: 4px; padding: 8px; background-color: #fafafa; text-align: center;">
+      <td style="width: 2%;"></td>
+      <td style="width: 32%; border: 1px solid #bbb; border-radius: 4px; padding: 8px; background-color: #fafafa; text-align: center;">
         <div style="font-size: 9.5px; color: #555; text-transform: uppercase;">${isPiutang ? 'Sudah Diterima' : 'Sudah Dibayar'}</div>
         <div style="font-size: 13px; font-weight: bold; margin-top: 3px; font-variant-numeric: tabular-nums;">
           ${formatRupiah(paid)}
         </div>
       </td>
-      <td style="width: 33.33%; border: 1.5px solid #333; border-radius: 4px; padding: 8px; background-color: #f1f3f5; text-align: center;">
+      <td style="width: 2%;"></td>
+      <td style="width: 32%; border: 1.5px solid #333; border-radius: 4px; padding: 8px; background-color: #f1f3f5; text-align: center;">
         <div style="font-size: 9.5px; color: #333; text-transform: uppercase; font-weight: bold;">Sisa Tagihan</div>
         <div style="font-size: 13px; font-weight: bold; margin-top: 3px; font-variant-numeric: tabular-nums;">
           ${formatRupiah(sisa)}
@@ -620,18 +624,18 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
     ${
       debt.payments.length === 0
         ? `
-      <div style="border: 1px solid #ddd; padding: 12px; text-align: center; color: #777; font-size: 10px; background-color: #fafafa; border-radius: 4px;">
+      <div style="border: 1px solid #bbb; padding: 12px; text-align: center; color: #777; font-size: 10px; background-color: #fafafa; border-radius: 4px;">
         Belum ada catatan pembayaran atau angsuran untuk item ini.
       </div>
     `
         : `
-      <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
         <thead>
           <tr style="background-color: #f1f3f5; color: #111;">
-            <th style="border: 1px solid #ccc; padding: 4px 6px; width: 30px; text-align: center;">No</th>
-            <th style="border: 1px solid #ccc; padding: 4px 6px; width: 100px; text-align: left;">Tanggal</th>
-            <th style="border: 1px solid #ccc; padding: 4px 6px; width: 120px; text-align: right;">Nominal Angsuran</th>
-            <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">Catatan / Keterangan</th>
+            <th style="border: 1px solid #bbb; padding: 5px 6px; width: 7%; text-align: center;">No</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 23%; text-align: left;">Tanggal</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 25%; text-align: right;">Nominal Angsuran</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 45%; text-align: left;">Catatan / Keterangan</th>
           </tr>
         </thead>
         <tbody>
@@ -639,12 +643,12 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
             .map(
               (p, idx) => `
             <tr>
-              <td style="border: 1px solid #ccc; padding: 3px 6px; text-align: center;">${idx + 1}</td>
-              <td style="border: 1px solid #ccc; padding: 3px 6px;">${escapeHtml(formatTanggalIndo(p.date))}</td>
-              <td style="border: 1px solid #ccc; padding: 3px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
+              <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: center;">${idx + 1}</td>
+              <td style="border: 1px solid #bbb; padding: 4px 8px;">${escapeHtml(formatTanggalIndo(p.date))}</td>
+              <td style="border: 1px solid #bbb; padding: 4px 8px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
                 p.amount
               )}</td>
-              <td style="border: 1px solid #ccc; padding: 3px 6px; color: #444;">${escapeHtml(p.notes || '-')}</td>
+              <td style="border: 1px solid #bbb; padding: 4px 8px; color: #333;">${escapeHtml(p.notes || '-')}</td>
             </tr>
           `
             )
@@ -652,11 +656,11 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
         </tbody>
         <tfoot>
           <tr style="background-color: #f8f9fa; font-weight: bold;">
-            <td colspan="2" style="border: 1px solid #ccc; padding: 4px 6px; text-align: right;">Total Telah Dibayar:</td>
-            <td style="border: 1px solid #ccc; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
+            <td colspan="2" style="border: 1px solid #bbb; padding: 5px 8px; text-align: right;">Total Telah Dibayar:</td>
+            <td style="border: 1px solid #bbb; padding: 5px 8px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
               paid
             )}</td>
-            <td style="border: 1px solid #ccc; padding: 4px 6px;"></td>
+            <td style="border: 1px solid #bbb; padding: 5px 8px;"></td>
           </tr>
         </tfoot>
       </table>

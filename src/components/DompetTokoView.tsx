@@ -515,7 +515,18 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     return true;
   };
 
-  const filteredList = transactions.filter(t => matchesFilter(t));
+  const filteredList = React.useMemo(() => {
+    return transactions
+      .filter(t => matchesFilter(t))
+      .sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        if (dateA === dateB) {
+          return sortOrder === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id);
+        }
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      });
+  }, [transactions, filter, sortOrder]);
 
   // Kantong (kartu di halaman utama): saldo tiap kantong sepanjang waktu
   const pockets = (() => {
@@ -651,7 +662,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
         {rows.length === 0 && <div className="px-2.5 py-2 text-slate-400">Tidak ada data.</div>}
 
-        <div className="divide-y divide-slate-100">
+        <div className="max-h-[225px] overflow-y-auto overscroll-contain divide-y divide-slate-100">
           {rows.map(r => {
             const selected = selectedKey === r.key;
             return (
@@ -659,13 +670,13 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
                 key={r.key}
                 type="button"
                 onClick={() => onSelect(selected ? 'ALL' : r.key)}
-                className={`w-full text-left flex items-center gap-2 px-2.5 py-2 transition cursor-pointer ${
+                className={`w-full text-left flex items-center gap-2 px-2.5 py-1.5 transition cursor-pointer ${
                   selected ? 'bg-amber-50 border-l-4 border-amber-400' : 'hover:bg-slate-50'
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-800 truncate">{r.label}</div>
-                  <div className="text-[11px] flex flex-wrap gap-x-2">
+                  <div className="font-semibold text-slate-800 truncate leading-tight">{r.label}</div>
+                  <div className="text-[10px] flex flex-wrap gap-x-2 leading-tight mt-0.5">
                     {r.masuk > 0 && <span className="text-emerald-700">Masuk {formatRupiah(r.masuk)}</span>}
                     {r.keluar > 0 && <span className="text-rose-700">Keluar {formatRupiah(r.keluar)}</span>}
                     {r.pindah !== 0 && (
@@ -793,7 +804,7 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   <style>
     @page {
       size: A4 portrait;
-      margin: 14mm 12mm 16mm 12mm;
+      margin: 14mm 10mm 16mm 10mm;
       @bottom-right {
         content: "Hal. " counter(page) " / " counter(pages);
         font-family: Arial, Helvetica, sans-serif;
@@ -813,7 +824,8 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
       color: #000;
       background: #fff;
       margin: 0;
-      padding: 0;
+      padding: 0 2mm;
+      width: 100%;
     }
     thead { display: table-header-group; }
     tfoot { display: table-row-group; }
@@ -841,10 +853,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   </table>
 
   <!-- Filter Criteria & Summary Side by Side -->
-  <table style="width: 100%; border-collapse: separate; border-spacing: 10px 0; margin-bottom: 12px;">
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
     <tr>
       <!-- Kriteria Filter -->
-      <td style="width: 50%; vertical-align: top; border: 1px solid #bbb; border-radius: 4px; padding: 6px 8px; background-color: #fafafa; font-size: 9.5px;">
+      <td style="width: 49%; vertical-align: top; border: 1px solid #bbb; border-radius: 4px; padding: 6px 8px; background-color: #fafafa; font-size: 9.5px;">
         <div style="font-weight: bold; font-size: 10.5px; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 4px; text-transform: uppercase;">
           Kriteria Filter
         </div>
@@ -854,8 +866,10 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         <div><b>Akun:</b> ${escapeHtml(akunLabel)} | <b>Jenis:</b> ${escapeHtml(jenisLabel)}</div>
       </td>
 
+      <td style="width: 2%;"></td>
+
       <!-- Ringkasan Hasil -->
-      <td style="width: 50%; vertical-align: top; border: 1px solid #bbb; border-radius: 4px; padding: 6px 8px; background-color: #fafafa; font-size: 9.5px;">
+      <td style="width: 49%; vertical-align: top; border: 1px solid #bbb; border-radius: 4px; padding: 6px 8px; background-color: #fafafa; font-size: 9.5px;">
         <div style="font-weight: bold; font-size: 10.5px; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 4px; text-transform: uppercase;">
           Ringkasan (${filteredList.length} Transaksi)
         </div>
@@ -881,13 +895,13 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
   <table style="width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 10px;">
     <thead>
       <tr style="background-color: #f1f3f5; color: #111;">
-        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 28px; text-align: center;">No</th>
-        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 75px; text-align: left;">Tanggal</th>
-        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 80px; text-align: left;">Akun</th>
-        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 95px; text-align: left;">Kantong</th>
-        <th style="border: 1px solid #ccc; padding: 4px 5px; text-align: left;">Keterangan</th>
-        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 85px; text-align: right;">Masuk</th>
-        <th style="border: 1px solid #ccc; padding: 4px 5px; width: 85px; text-align: right;">Keluar</th>
+        <th style="border: 1px solid #bbb; padding: 4px 5px; width: 5%; text-align: center;">No</th>
+        <th style="border: 1px solid #bbb; padding: 4px 6px; width: 14%; text-align: left;">Tanggal</th>
+        <th style="border: 1px solid #bbb; padding: 4px 6px; width: 12%; text-align: left;">Akun</th>
+        <th style="border: 1px solid #bbb; padding: 4px 6px; width: 16%; text-align: left;">Kantong</th>
+        <th style="border: 1px solid #bbb; padding: 4px 6px; width: 25%; text-align: left;">Keterangan</th>
+        <th style="border: 1px solid #bbb; padding: 4px 6px; width: 14%; text-align: right;">Masuk</th>
+        <th style="border: 1px solid #bbb; padding: 4px 6px; width: 14%; text-align: right;">Keluar</th>
       </tr>
     </thead>
     <tbody>
@@ -895,15 +909,15 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
         .map(
           (t, idx) => `
         <tr>
-          <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: center;">${idx + 1}</td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(formatTanggalIndo(t.date))}</td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(getAccountName(t.accountId))}</td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(getTxKantong(t) || t.category || '-')}</td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px;">${escapeHtml(t.description)}</td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">
+          <td style="border: 1px solid #bbb; padding: 3.5px 5px; text-align: center;">${idx + 1}</td>
+          <td style="border: 1px solid #bbb; padding: 3.5px 6px;">${escapeHtml(formatTanggalIndo(t.date))}</td>
+          <td style="border: 1px solid #bbb; padding: 3.5px 6px;">${escapeHtml(getAccountName(t.accountId))}</td>
+          <td style="border: 1px solid #bbb; padding: 3.5px 6px;">${escapeHtml(getTxKantong(t) || t.category || '-')}</td>
+          <td style="border: 1px solid #bbb; padding: 3.5px 6px;">${escapeHtml(t.description)}</td>
+          <td style="border: 1px solid #bbb; padding: 3.5px 6px; text-align: right; font-variant-numeric: tabular-nums;">
             ${t.type === 'masuk' ? formatRupiah(t.amount) : '-'}
           </td>
-          <td style="border: 1px solid #ccc; padding: 3px 5px; text-align: right; font-variant-numeric: tabular-nums;">
+          <td style="border: 1px solid #bbb; padding: 3.5px 6px; text-align: right; font-variant-numeric: tabular-nums;">
             ${t.type === 'keluar' ? formatRupiah(t.amount) : '-'}
           </td>
         </tr>
@@ -913,11 +927,11 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
     </tbody>
     <tfoot>
       <tr style="background-color: #f8f9fa; font-weight: bold;">
-        <td colspan="5" style="border: 1px solid #ccc; padding: 4px 5px; text-align: right;">Total:</td>
-        <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
+        <td colspan="5" style="border: 1px solid #bbb; padding: 4px 6px; text-align: right;">Total:</td>
+        <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
           totalMasuk
         )}</td>
-        <td style="border: 1px solid #ccc; padding: 4px 5px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
+        <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
           totalKeluar
         )}</td>
       </tr>
@@ -2210,122 +2224,178 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
               );
             })()}
 
-            {/* Rekap per Kantong, Rekap per Kategori & Rekap per Akun (klik baris untuk memfilter) */}
+            {/* Rekap per Akun, Rekap per Kantong & Rekap per Kategori (klik baris untuk memfilter) */}
+            {renderRecap('Rekap per Akun', accountRecap, filter.accountId, key => onFilterChange({ accountId: key }), 'Pindah saldo')}
             {renderRecap('Rekap per Kantong', kantongRecap, filter.kantong, key => onFilterChange({ kantong: key }), 'Pindah')}
             {renderRecap('Rekap per Kategori', categoryRecap, filter.category, key => onFilterChange({ category: key }), 'Pindah')}
-            {renderRecap('Rekap per Akun', accountRecap, filter.accountId, key => onFilterChange({ accountId: key }), 'Pindah saldo')}
 
-            {/* Filtered list preview (Full, no text truncation) */}
-            <div className="max-h-[500px] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white">
-              {filteredList.length === 0 ? (
-                <div className="p-4 text-center text-slate-400">
-                  Tidak ada transaksi yang cocok dengan filter yang dipilih.
+            {/* Riwayat Transaksi Hasil Filter (Urut per Tanggal seperti di Halaman Utama) */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs space-y-2.5">
+              <div className="pb-2 border-b border-slate-100 flex items-center justify-between relative z-10">
+                <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  RIWAYAT TRANSAKSI ({filteredList.length})
+                </h2>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{sortOrder === 'desc' ? 'Terbaru' : 'Terlama'}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${sortDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {sortDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setSortDropdownOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSortOrder('desc');
+                            setSortDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-xs font-medium transition flex items-center justify-between ${
+                            sortOrder === 'desc'
+                              ? 'bg-amber-50 text-amber-900'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>Terbaru</span>
+                          {sortOrder === 'desc' && <Check className="w-3.5 h-3.5 text-amber-700" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSortOrder('asc');
+                            setSortDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-xs font-medium transition flex items-center justify-between ${
+                            sortOrder === 'asc'
+                              ? 'bg-amber-50 text-amber-900'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>Terlama</span>
+                          {sortOrder === 'asc' && <Check className="w-3.5 h-3.5 text-amber-700" />}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              ) : (
-                filteredList.slice(0, filterDisplayCount).map(t => (
-                  <div key={t.id} className="p-2.5 flex items-start justify-between gap-2 hover:bg-slate-50 transition">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs sm:text-sm font-semibold text-slate-900 break-words leading-snug">
-                        <span>{t.description}</span>
-                        <span className="text-slate-400 font-normal mx-1.5">—</span>
-                        <span className={`font-bold font-mono text-xs sm:text-sm inline-block ${t.type === 'masuk' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {formatRupiah(t.amount)}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-1 leading-relaxed">
-                        <span>{formatTanggalIndo(t.date, true)}</span>
-                        <span>•</span>
-                        <span className="font-medium text-slate-700">{getAccountName(t.accountId)}</span>
-                        <span>•</span>
-                        <span className={`font-medium ${t.type === 'masuk' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {t.type === 'masuk' ? 'Masuk' : 'Keluar'}
-                        </span>
-                        {(() => {
-                          const kt = getTxKantong(t);
-                          const cat =
-                            t.category && t.category !== '-' && t.category !== 'Pindah Kantong'
-                              ? t.category.trim()
-                              : '';
-                          return (
-                            <>
-                              {kt && (
-                                <>
-                                  <span>•</span>
-                                  <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
-                                    {kt}
-                                  </span>
-                                </>
-                              )}
-                              {cat && cat.toLowerCase() !== kt.toLowerCase() && (
-                                <>
-                                  <span>•</span>
-                                  <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
-                                    {cat}
-                                  </span>
-                                </>
-                              )}
-                            </>
-                          );
-                        })()}
-                        {isCatTransfer(t) && (
-                          <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
-                            Pindah jatah
-                          </span>
-                        )}
-                        {(t.notes || t.catatan) && (
-                          <>
-                            <span>•</span>
-                            <span className="italic text-slate-500 break-words">
-                              "{t.notes || t.catatan}"
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {isAdmin && (
-                      <div className="flex items-center gap-1 shrink-0 pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleStartEdit(t)}
-                          className="p-1 text-slate-400 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-md transition cursor-pointer"
-                          title="Edit Transaksi (Admin)"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteTransaction(t.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
-                          title="Hapus Transaksi (Admin)"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Load more button in filter if there are more */}
-            {filteredList.length > filterDisplayCount && (
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={() => setFilterDisplayCount(prev => prev + 25)}
-                  className="text-xs font-semibold text-[#1e3a5f] hover:underline"
-                >
-                  Tampilkan 25 lagi (sisa {filteredList.length - filterDisplayCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterDisplayCount(filteredList.length)}
-                  className="text-xs font-semibold text-[#1e3a5f] hover:underline"
-                >
-                  Tampilkan Semua ({filteredList.length})
-                </button>
               </div>
-            )}
+
+              <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {filteredList.length === 0 ? (
+                  <div className="py-6 text-center text-slate-400">
+                    Tidak ada transaksi yang cocok dengan filter yang dipilih.
+                  </div>
+                ) : (
+                  filteredList.map(tx => {
+                    const isMasuk = tx.type === 'masuk';
+                    const accName = getAccountName(tx.accountId);
+                    const dateStr = formatTanggalIndo(tx.date, true);
+
+                    return (
+                      <div
+                        key={tx.id}
+                        className="py-2.5 first:pt-1 last:pb-1 group flex items-start justify-between gap-2.5 hover:bg-slate-50/60 px-1 rounded-lg transition"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs sm:text-sm font-semibold text-slate-900 break-words leading-snug">
+                            <span>{tx.description}</span>
+                            <span className="text-slate-400 font-normal mx-1.5 select-none">—</span>
+                            <span className={`font-bold font-mono text-xs sm:text-sm inline-block ${
+                              isMasuk ? 'text-emerald-700' : 'text-rose-700'
+                            }`}>
+                              {formatRupiah(tx.amount)}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed">
+                            <span>{dateStr}</span>
+                            <span>•</span>
+                            <span className="font-medium text-slate-700">{accName}</span>
+                            <span>•</span>
+                            <span className={`font-medium ${isMasuk ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {isMasuk ? 'Masuk' : 'Keluar'}
+                            </span>
+                            {(() => {
+                              const kt = getTxKantong(tx);
+                              const cat =
+                                tx.category && tx.category !== '-' && tx.category !== 'Pindah Kantong'
+                                  ? tx.category.trim()
+                                  : '';
+                              return (
+                                <>
+                                  {kt && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
+                                        {kt}
+                                      </span>
+                                    </>
+                                  )}
+                                  {cat && cat.toLowerCase() !== kt.toLowerCase() && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                                        {cat}
+                                      </span>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
+                            {isCatTransfer(tx) && (
+                              <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
+                                Pindah jatah
+                              </span>
+                            )}
+                            {(tx.notes || tx.catatan) && (
+                              <>
+                                <span>•</span>
+                                <span className="italic text-slate-500 break-words">
+                                  "{tx.notes || tx.catatan}"
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {isAdmin && (
+                          <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                            {!isCatTransfer(tx) && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(tx)}
+                                title="Edit transaksi ini (Admin)"
+                                className="p-1 text-slate-400 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-md transition cursor-pointer"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onDeleteTransaction(tx.id)}
+                              title="Hapus transaksi ini (Admin)"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
                         <div className={`grid grid-cols-1 gap-2 pt-1 ${isAdmin ? 'sm:grid-cols-2' : ''}`}>
               <button
@@ -2354,175 +2424,177 @@ export const DompetTokoView: React.FC<DompetTokoViewProps> = ({
 
       </div>
 
-      {/* RIWAYAT TRANSAKSI Card (Scrollable container agar halaman tidak panjang) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-2.5">
-        <div className="pb-2 border-b border-slate-100 flex items-center justify-between relative z-10">
-          <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-            RIWAYAT TRANSAKSI ({transactions.length})
-          </h2>
-          
-          {/* Dropdown Sorting Modern & Rounded */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-              <span>{sortOrder === 'desc' ? 'Terbaru' : 'Terlama'}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${sortDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Dropdown Menu */}
-            {sortDropdownOpen && (
-              <>
-                {/* Backdrop untuk menutup dropdown saat klik di luar */}
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setSortDropdownOpen(false)}
-                />
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortOrder('desc');
-                      setSortDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-xs font-medium transition flex items-center justify-between ${
-                      sortOrder === 'desc' 
-                        ? 'bg-amber-50 text-amber-900' 
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>Terbaru</span>
-                    {sortOrder === 'desc' && <Check className="w-3.5 h-3.5 text-amber-700" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortOrder('asc');
-                      setSortDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-xs font-medium transition flex items-center justify-between ${
-                      sortOrder === 'asc' 
-                        ? 'bg-amber-50 text-amber-900' 
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>Terlama</span>
-                    {sortOrder === 'asc' && <Check className="w-3.5 h-3.5 text-amber-700" />}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Scrollable Transaction History Items */}
-        <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {sortedTransactions.map(tx => {
-            const isMasuk = tx.type === 'masuk';
-            const accName = getAccountName(tx.accountId);
-            const dateStr = formatTanggalIndo(tx.date, true);
-
-            return (
-              <div 
-                key={tx.id} 
-                className="py-2.5 first:pt-1 last:pb-1 group flex items-start justify-between gap-2.5 hover:bg-slate-50/60 px-1 rounded-lg transition"
+      {/* RIWAYAT TRANSAKSI Card (Tidak ditampilkan saat di tab Filter) */}
+      {activeTab !== 'filter' && (
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-2.5">
+          <div className="pb-2 border-b border-slate-100 flex items-center justify-between relative z-10">
+            <h2 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+              RIWAYAT TRANSAKSI ({transactions.length})
+            </h2>
+            
+            {/* Dropdown Sorting Modern & Rounded */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
               >
-                <div className="min-w-0 flex-1">
-                  {/* Full Description & Nominal with wrap, strictly no truncate */}
-                  <div className="text-xs sm:text-sm font-semibold text-slate-900 break-words leading-snug">
-                    <span>{tx.description}</span>
-                    <span className="text-slate-400 font-normal mx-1.5 select-none">—</span>
-                    <span className={`font-bold font-mono text-xs sm:text-sm inline-block ${
-                      isMasuk ? 'text-emerald-700' : 'text-rose-700'
-                    }`}>
-                      {formatRupiah(tx.amount)}
-                    </span>
-                  </div>
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+                <span>{sortOrder === 'desc' ? 'Terbaru' : 'Terlama'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${sortDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-                  {/* Date, Account, Type, Category Subtitle with clear wrap */}
-                  <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed">
-                    <span>{dateStr}</span>
-                    <span>•</span>
-                    <span className="font-medium text-slate-700">{accName}</span>
-                    <span>•</span>
-                    <span className={`font-medium ${isMasuk ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {isMasuk ? 'Masuk' : 'Keluar'}
-                    </span>
-                    {(() => {
-                      const kt = getTxKantong(tx);
-                      const cat =
-                        tx.category && tx.category !== '-' && tx.category !== 'Pindah Kantong'
-                          ? tx.category.trim()
-                          : '';
-                      return (
-                        <>
-                          {kt && (
-                            <>
-                              <span>•</span>
-                              <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
-                                {kt}
-                              </span>
-                            </>
-                          )}
-                          {cat && cat.toLowerCase() !== kt.toLowerCase() && (
-                            <>
-                              <span>•</span>
-                              <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
-                                {cat}
-                              </span>
-                            </>
-                          )}
-                        </>
-                      );
-                    })()}
-                    {isCatTransfer(tx) && (
-                      <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
-                        Pindah jatah
-                      </span>
-                    )}
-                    {(tx.notes || tx.catatan) && (
-                      <>
-                        <span>•</span>
-                        <span className="italic text-slate-500 break-words">
-                          "{tx.notes || tx.catatan}"
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Edit & Delete Buttons - Hanya Muncul di Mode Admin */}
-                {isAdmin && (
-                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
-                    {!isCatTransfer(tx) && (
-                      <button
-                        type="button"
-                        onClick={() => handleStartEdit(tx)}
-                        title="Edit transaksi ini (Admin)"
-                        className="p-1 text-slate-400 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-md transition cursor-pointer"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+              {/* Dropdown Menu */}
+              {sortDropdownOpen && (
+                <>
+                  {/* Backdrop untuk menutup dropdown saat klik di luar */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setSortDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                     <button
                       type="button"
-                      onClick={() => onDeleteTransaction(tx.id)}
-                      title="Hapus transaksi ini (Admin)"
-                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                      onClick={() => {
+                        setSortOrder('desc');
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition flex items-center justify-between ${
+                        sortOrder === 'desc' 
+                          ? 'bg-amber-50 text-amber-900' 
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Terbaru</span>
+                      {sortOrder === 'desc' && <Check className="w-3.5 h-3.5 text-amber-700" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSortOrder('asc');
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition flex items-center justify-between ${
+                        sortOrder === 'asc' 
+                          ? 'bg-amber-50 text-amber-900' 
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>Terlama</span>
+                      {sortOrder === 'asc' && <Check className="w-3.5 h-3.5 text-amber-700" />}
                     </button>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </>
+              )}
+            </div>
+          </div>
 
-      </div>
+          {/* Scrollable Transaction History Items */}
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {sortedTransactions.map(tx => {
+              const isMasuk = tx.type === 'masuk';
+              const accName = getAccountName(tx.accountId);
+              const dateStr = formatTanggalIndo(tx.date, true);
+
+              return (
+                <div 
+                  key={tx.id} 
+                  className="py-2.5 first:pt-1 last:pb-1 group flex items-start justify-between gap-2.5 hover:bg-slate-50/60 px-1 rounded-lg transition"
+                >
+                  <div className="min-w-0 flex-1">
+                    {/* Full Description & Nominal with wrap, strictly no truncate */}
+                    <div className="text-xs sm:text-sm font-semibold text-slate-900 break-words leading-snug">
+                      <span>{tx.description}</span>
+                      <span className="text-slate-400 font-normal mx-1.5 select-none">—</span>
+                      <span className={`font-bold font-mono text-xs sm:text-sm inline-block ${
+                        isMasuk ? 'text-emerald-700' : 'text-rose-700'
+                      }`}>
+                        {formatRupiah(tx.amount)}
+                      </span>
+                    </div>
+
+                    {/* Date, Account, Type, Category Subtitle with clear wrap */}
+                    <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed">
+                      <span>{dateStr}</span>
+                      <span>•</span>
+                      <span className="font-medium text-slate-700">{accName}</span>
+                      <span>•</span>
+                      <span className={`font-medium ${isMasuk ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {isMasuk ? 'Masuk' : 'Keluar'}
+                      </span>
+                      {(() => {
+                        const kt = getTxKantong(tx);
+                        const cat =
+                          tx.category && tx.category !== '-' && tx.category !== 'Pindah Kantong'
+                            ? tx.category.trim()
+                            : '';
+                        return (
+                          <>
+                            {kt && (
+                              <>
+                                <span>•</span>
+                                <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-purple-200">
+                                  {kt}
+                                </span>
+                              </>
+                            )}
+                            {cat && cat.toLowerCase() !== kt.toLowerCase() && (
+                              <>
+                                <span>•</span>
+                                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                                  {cat}
+                                </span>
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
+                      {isCatTransfer(tx) && (
+                        <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200">
+                          Pindah jatah
+                        </span>
+                      )}
+                      {(tx.notes || tx.catatan) && (
+                        <>
+                          <span>•</span>
+                          <span className="italic text-slate-500 break-words">
+                            "{tx.notes || tx.catatan}"
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Edit & Delete Buttons - Hanya Muncul di Mode Admin */}
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                      {!isCatTransfer(tx) && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(tx)}
+                          title="Edit transaksi ini (Admin)"
+                          className="p-1 text-slate-400 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-md transition cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onDeleteTransaction(tx.id)}
+                        title="Hapus transaksi ini (Admin)"
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      )}
 
       {/* MODAL EDIT TRANSAKSI (ADMIN) */}
       {editingTx && (
