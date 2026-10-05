@@ -7,7 +7,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   INITIAL_ACCOUNTS, 
   INITIAL_CATEGORIES,
-  INITIAL_TRANSACTIONS
+  INITIAL_TRANSACTIONS,
+  INITIAL_KANTONG // <--- Tambahkan ini
 } from './data/initialData.ts';
 import { 
   Transaction, 
@@ -422,14 +423,15 @@ export default function App() {
       if (raw) {
         const c = JSON.parse(raw);
         if (Array.isArray(c.accounts) && Array.isArray(c.transactions)) {
-          setAccounts(c.accounts);
-          setTransactions(c.transactions);
-          setCategories(Array.isArray(c.categories) ? c.categories : []);
-          if (c.storeName) setStoreName(c.storeName);
-          if (c.ownerName) setOwnerName(c.ownerName);
-          hasCache = true;
-          setIsLoading(false);
-        }
+  setAccounts(c.accounts);
+  setTransactions(c.transactions);
+  setCategories(Array.isArray(c.categories) ? c.categories : []);
+  if (Array.isArray(c.kantongList)) setKantongList(c.kantongList); // <--- Tambahkan ini
+  if (c.storeName) setStoreName(c.storeName);
+  if (c.ownerName) setOwnerName(c.ownerName);
+  hasCache = true;
+  setIsLoading(false);
+}
       }
     } catch {
       /* cache rusak, abaikan */
@@ -453,10 +455,11 @@ export default function App() {
         await Promise.all(cats.map(c => apiAddCategory(c))).catch(() => {});
       }
 
-      let kts = (data.kantongList || []).filter(k => !isExcludedCategory(k));
-      if (kts.length === 0) {
-        kts = INITIAL_KANTONG.filter(k => !isExcludedCategory(k));
-      }
+     // Ganti data.kantongList menjadi data.kantongs
+let kts = (data.kantongs || []).filter(k => !isExcludedCategory(k));
+if (kts.length === 0) {
+  kts = INITIAL_KANTONG ? INITIAL_KANTONG.filter(k => !isExcludedCategory(k)) : [];
+}
 
       setAccounts(accs);
       setTransactions(data.transactions);
@@ -471,31 +474,36 @@ export default function App() {
         .then(setDebts)
         .catch(err => console.warn('Gagal memuat utang-piutang:', err));
     } catch (e: any) {
-      console.warn('Gagal memuat data dari database/server, fallback ke penyimpanan lokal:', e);
-      setAccounts(INITIAL_ACCOUNTS);
-      setTransactions(INITIAL_TRANSACTIONS);
-      setCategories(INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c)));
-      setLoadError(null);
-    } finally {
-      clearTimeout(slowTimer);
-      setLoadSlow(false);
-      setIsLoading(false);
-    }
+  console.warn('Gagal memuat data dari database/server, fallback ke penyimpanan lokal:', e);
+  setAccounts(INITIAL_ACCOUNTS);
+  setTransactions(INITIAL_TRANSACTIONS);
+  setCategories(INITIAL_CATEGORIES.filter(c => !isExcludedCategory(c)));
+  // Tambahkan ini agar kantong tetap muncul saat offline:
+  setKantongList(INITIAL_KANTONG ? INITIAL_KANTONG.filter(k => !isExcludedCategory(k)) : []);
+  setLoadError(null);
+}
   };
 
   // Simpan salinan terbaru agar pembukaan berikutnya langsung tampil
   useEffect(() => {
-    if (isLoading || accounts.length === 0) return;
-    try {
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({ accounts, transactions, categories, storeName, ownerName })
-      );
-    } catch {
-      /* penyimpanan penuh, abaikan */
-    }
-  }, [accounts, transactions, categories, storeName, ownerName, isLoading]);
-
+  if (isLoading || accounts.length === 0) return;
+  try {
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ 
+        accounts, 
+        transactions, 
+        categories, 
+        kantongList, // <--- Tambahkan ini
+        storeName, 
+        ownerName 
+      })
+    );
+  } catch {
+    /* penyimpanan penuh, abaikan */
+  }
+}, [accounts, transactions, categories, kantongList, storeName, ownerName, isLoading]); // <--- Tambahkan kantongList di dependency array
+  
   useEffect(() => {
     loadAll();
   }, []);
