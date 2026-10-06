@@ -17,37 +17,8 @@ function createDb(url: string) {
   return drizzle(neon(url), { schema });
 }
 
-const dbUrl = getCleanDatabaseUrl();
-export const isNeonConfigured = Boolean(dbUrl);
-
-let sql: ReturnType<typeof neon<false, false>>;
-let db: ReturnType<typeof createDb>;
-
-try {
-  if (dbUrl) {
-    sql = neon(dbUrl);
-    db = createDb(dbUrl);
-  } else {
-    console.warn('[AI Studio] Database not connected — using mock');
-    const noOp = {
-      findMany: async () => [],
-      findFirst: async () => null,
-      findUnique: async () => null,
-      create: async (d: any) => d?.data ?? {},
-      update: async (d: any) => d?.data ?? {},
-      delete: async () => ({}),
-    };
-    db = new Proxy(
-      {},
-      {
-        get: (_, prop) =>
-          prop === 'query' ? new Proxy({}, { get: () => noOp }) : async () => [],
-      }
-    ) as any;
-    sql = (async () => []) as any;
-  }
-} catch {
-  console.warn('[AI Studio] Database not connected — using mock');
+// Mock dipakai bila DATABASE_URL kosong, supaya aplikasi tidak crash saat import.
+function createMockDb(): any {
   const noOp = {
     findMany: async () => [],
     findFirst: async () => null,
@@ -56,13 +27,35 @@ try {
     update: async (d: any) => d?.data ?? {},
     delete: async () => ({}),
   };
-  db = new Proxy(
+  return new Proxy(
     {},
     {
       get: (_, prop) =>
         prop === 'query' ? new Proxy({}, { get: () => noOp }) : async () => [],
     }
-  ) as any;
+  );
+}
+
+const dbUrl = getCleanDatabaseUrl();
+export const isNeonConfigured = Boolean(dbUrl);
+
+let sql: ReturnType<typeof neon<false, false>>;
+let db: ReturnType<typeof createDb>;
+
+try {
+  if (dbUrl) {
+    // Satu klien dipakai bersama oleh `sql` (query mentah) dan `db` (drizzle).
+    const client = neon(dbUrl);
+    sql = client;
+    db = drizzle(client, { schema });
+  } else {
+    console.warn('[AI Studio] Database not connected — using mock');
+    db = createMockDb();
+    sql = (async () => []) as any;
+  }
+} catch {
+  console.warn('[AI Studio] Database not connected — using mock');
+  db = createMockDb();
   sql = (async () => []) as any;
 }
 
@@ -75,11 +68,15 @@ export function hasDatabaseUrl(): boolean {
   return Boolean(getCleanDatabaseUrl());
 }
 
-// Koneksi dibuat saat pertama dipakai, supaya error "DATABASE_URL kosong" muncul sebagai pesan API yang jelas
+// Koneksi dibuat saat pertama dipakai, supaya error "DATABASE_URL kosong" muncul sebagai pesan API yang jelas.
+// Jika URL sama dengan yang dipakai saat modul dimuat, instance `db` yang sama dipakai ulang.
 export function getDb() {
   const url = getCleanDatabaseUrl();
   if (!url) {
     throw new Error('DATABASE_URL belum diisi. Tambahkan di Environment Variables (Vercel) atau file .env.');
+  }
+  if (isNeonConfigured && url === dbUrl) {
+    return db;
   }
   if (!instance || lastUrl !== url) {
     instance = createDb(url);
