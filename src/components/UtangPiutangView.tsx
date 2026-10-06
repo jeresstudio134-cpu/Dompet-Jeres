@@ -504,6 +504,10 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
     const paid = getTotalPaid(debt);
     const sisa = getSisa(debt);
     const lunas = isLunas(debt);
+    const getAccountName = (accountId?: string) => {
+  if (!accountId) return '-';
+  return accounts.find(a => a.id === accountId)?.name || '-';
+};
 
     const html = `<!DOCTYPE html>
 <html lang="id">
@@ -652,13 +656,14 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
       </div>
     `
         : `
-      <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
         <thead>
           <tr style="background-color: #f1f3f5; color: #111;">
-            <th style="border: 1px solid #bbb; padding: 5px 6px; width: 7%; text-align: center;">No</th>
-            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 23%; text-align: left;">Tanggal</th>
-            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 25%; text-align: right;">Nominal Angsuran</th>
-            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 45%; text-align: left;">Catatan / Keterangan</th>
+            <th style="border: 1px solid #bbb; padding: 5px 6px; width: 6%; text-align: center;">No</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 18%; text-align: left;">Tanggal</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 16%; text-align: left;">Akun</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 22%; text-align: right;">Nominal Angsuran</th>
+            <th style="border: 1px solid #bbb; padding: 5px 8px; width: 38%; text-align: left;">Catatan / Keterangan</th>
           </tr>
         </thead>
         <tbody>
@@ -668,6 +673,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
             <tr>
               <td style="border: 1px solid #bbb; padding: 4px 6px; text-align: center;">${idx + 1}</td>
               <td style="border: 1px solid #bbb; padding: 4px 8px;">${escapeHtml(formatTanggalIndo(p.date))}</td>
+              <td style="border: 1px solid #bbb; padding: 4px 8px;">${escapeHtml(getAccountName(p.accountId))}</td>
               <td style="border: 1px solid #bbb; padding: 4px 8px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
                 p.amount
               )}</td>
@@ -679,7 +685,7 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
         </tbody>
         <tfoot>
           <tr style="background-color: #f8f9fa; font-weight: bold;">
-            <td colspan="2" style="border: 1px solid #bbb; padding: 5px 8px; text-align: right;">Total Telah Dibayar:</td>
+            <td colspan="3" style="border: 1px solid #bbb; padding: 5px 8px; text-align: right;">Total Telah Dibayar:</td>
             <td style="border: 1px solid #bbb; padding: 5px 8px; text-align: right; font-variant-numeric: tabular-nums;">${formatRupiah(
               paid
             )}</td>
