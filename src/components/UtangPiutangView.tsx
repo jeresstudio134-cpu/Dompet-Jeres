@@ -23,6 +23,8 @@ import { Debt, DebtType, DebtPayment, Account } from '../types/finance.ts';
 import { formatRupiah, formatTanggalIndo, parseRupiahInput, getCurrentDateIndo } from '../utils/formatters.ts';
 import { escapeHtml, printHtml } from '../utils/printReport.ts';
 
+// Tanda kosong seragam untuk semua kotak yang datanya belum diisi
+const EMPTY_DASH = <span className="font-mono">—</span>;
 interface UtangPiutangViewProps {
   debts: Debt[];
   accounts: Account[];
@@ -960,30 +962,34 @@ export const UtangPiutangView: React.FC<UtangPiutangViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Tanggal, jatuh tempo, cicilan (selalu tampil, kosong = "—") */}
+                  {/* Tanggal, jatuh tempo, cicilan (selalu tampil, kosong = tanda yang sama) */}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div className="bg-slate-50 rounded-lg px-2.5 py-1.5">
                       <div className="text-[10px] text-slate-500 font-medium">Tanggal Mulai</div>
                       <div className="text-xs font-bold text-slate-700 truncate">
-                        {debt.startDate ? formatTanggalIndo(debt.startDate) : '—'}
+                        {debt.startDate ? formatTanggalIndo(debt.startDate) : EMPTY_DASH}
                       </div>
                     </div>
                     <div className="bg-slate-50 rounded-lg px-2.5 py-1.5">
                       <div className="text-[10px] text-slate-500 font-medium">Jatuh Tempo</div>
                       <div className="text-xs font-bold text-slate-700 truncate">
-                        {debt.dueDate ? formatTanggalIndo(debt.dueDate) : '—'}
+                        {debt.dueDate ? formatTanggalIndo(debt.dueDate) : EMPTY_DASH}
                       </div>
                     </div>
                     <div className="bg-slate-50 rounded-lg px-2.5 py-1.5">
                       <div className="text-[10px] text-slate-500 font-medium">Cicilan / Bulan</div>
-                      <div className="text-xs font-bold font-mono text-slate-700 truncate">
-                        {debt.installmentAmount ? formatRupiah(debt.installmentAmount) : '—'}
+                      <div className="text-xs font-bold text-slate-700 truncate">
+                        {debt.installmentAmount ? (
+                          <span className="font-mono">{formatRupiah(debt.installmentAmount)}</span>
+                        ) : (
+                          EMPTY_DASH
+                        )}
                       </div>
                     </div>
                     <div className="bg-slate-50 rounded-lg px-2.5 py-1.5">
                       <div className="text-[10px] text-slate-500 font-medium">Jumlah Cicilan</div>
                       <div className="text-xs font-bold text-slate-700 truncate">
-                        {debt.installmentPeriod ? `${debt.installmentPeriod}x` : '—'}
+                        {debt.installmentPeriod ? `${debt.installmentPeriod}x` : EMPTY_DASH}
                       </div>
                     </div>
                   </div>
